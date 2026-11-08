@@ -19,6 +19,9 @@ export class RuntimeAutopilotEngine {
  private current(){return !this.closed&&!this.project.closed&&this.runtime.project===this.project}
  private notice(code:string,reason:string,source?:AutopilotIssue['source'],generation=this.runtime.settings.autopilot().generation){if(!this.current())return;reason=safeDiagnostic(reason,{project:this.project.dir});this.project.journal.append({sender:'harness',to:['owner'],kind:'note',origin:'autopilot-owner',text:JSON.stringify({code,reason,generation,source:source??null})});this.project.owner.publish({type:'autopilotWaiting',code,reason,source:source??null})}
  private async scan(){
+  // The decision ledger requires POSIX ownership and mode checks. Windows needs
+  // an ACL-backed ledger before autonomous decisions can be enabled safely.
+  if(process.platform==='win32')return;
   if(!this.current())return;const r=this.runtime,p=this.project;
   if(!this.recovered){await recoverAutopilotIntents(r,p);this.recovered=true}const state=await r.autopilotStatus();if(!this.current()||!state.on)return;
   if([...p.registry.panes.values()].some(pane=>(pane.kind==='orchestrator'||pane.kind==='reviewer')&&(pane.busy||p.editing.has(pane.id)||p.materializing.has(pane.id))))return;

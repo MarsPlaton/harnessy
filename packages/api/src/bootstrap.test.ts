@@ -36,6 +36,19 @@ test('5/14: valid last project wins; HARNESS_NO_LAST ignores it and preserves re
  const skipped=await bootstrap({...h.options,env:{...h.env,HARNESS_NO_LAST:'1'}});assert.equal(skipped.runtime.project.dir,h.env.CHAT_WORK_DIR);await skipped.close();assert.equal(readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),last);assert.equal(readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8'),registry)
 });
 
+test('Windows pilot keeps Autopilot unavailable without filling the owner journal with ledger errors',{skip:process.platform!=='win32'},async t=>{
+ const h=setup(t),app=await bootstrap(h.options);t.after(()=>app.close());await app.runtime.idle();
+ const status=await fetch(app.url+'/api/status').then(r=>r.json()) as any;
+ assert.equal(status.autopilot.on,false);assert.equal(status.autopilot.available,false);
+ const before=app.runtime.settings.autopilot();
+ const enabled=await fetch(app.url+'/api/autopilot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({project:status.project,instance:status.trace.instanceId,on:true,revision:before.revision})});
+ assert.equal(enabled.status,409);assert.equal((await enabled.json() as any).code,'autopilot_unsupported');
+ assert.deepEqual(app.runtime.settings.autopilot(),before);
+ const decisions=await fetch(app.url+'/api/autopilot/decisions').then(r=>r.json()) as any;
+ assert.equal(decisions.available,false);assert.deepEqual(decisions.decisions,[]);
+ assert.equal(app.runtime.journal.read({limit:0}).some(row=>row.origin==='autopilot-owner'),false);
+});
+
 test('17/18: occupied port and partial runtime startup both close created providers without model calls',async t=>{
  const h=setup(t),occupied=createServer();await new Promise<void>(resolve=>occupied.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise<void>(resolve=>occupied.close(()=>resolve())));
  await assert.rejects(bootstrap({...h.options,env:{...h.env,PORT:String((occupied.address() as AddressInfo).port)}}),/EADDRINUSE/);assert.equal(h.claude.closes,1);assert.equal(h.codex.closes,1);assert.equal(h.claude.calls.length,0);

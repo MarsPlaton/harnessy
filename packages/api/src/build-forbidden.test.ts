@@ -26,7 +26,7 @@ const asar=(files:Record<string,Buffer>)=>{let offset=0;const body:Buffer[]=[],e
 test('TS-32: one marker list rejects owner data, absolute project roots and credential-shaped values with the file name',t=>{
  const dir=mkdtempSync(join(tmpdir(),'harnessy-ts32-guard-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));mkdirSync(join(dir,'nested'));
  writeFileSync(join(dir,'masked.txt'),'you@example.com\nsk-…8f2a\n~/Harnessy-Projects\n');assert.equal(runGuard(dir).status,0);
- const cases:ReadonlyArray<readonly [string,string]>=[['profile.html','9616166@gmail.com'],['home.txt','/Users/tester/Harnessy-Projects/demo'],['windows-home.txt','C:\\Users\\Test Owner\\Harnessy-Projects\\private'],['windows-json.txt',JSON.stringify({project:'C:\\Users\\Test Owner\\Harnessy-Projects\\private'})],['token.js','const access_token="sk-live-0123456789abcdefghijklmnop"']];
+ const cases:ReadonlyArray<readonly [string,string]>=[['profile.html','9616166@gmail.com'],['home.txt','/Users/tester/Harnessy-Projects/demo'],['windows-home.txt','C:\\Users\\Test Owner\\Harnessy-Projects\\private'],['windows-json.txt',JSON.stringify({project:'C:\\Users\\Test Owner\\Harnessy-Projects\\private'})],['windows-posix.txt','C:/Users/Test Owner/Harnessy-Projects/private'],['windows-url.txt','file:///C:/Users/Test Owner/Harnessy-Projects/private'],['token.js','const access_token="sk-live-0123456789abcdefghijklmnop"']];
  for(const [name,value] of cases){
   const path=join(dir,'nested',name);writeFileSync(path,value);const blocked=runGuard(dir);assert.equal(blocked.status,1,name);assert.match(blocked.stderr.replaceAll('\\','/'),new RegExp('nested/'+name.replace('.','\\.')));assert.doesNotMatch(blocked.stderr,/9616166|sk-live-0123456789/);rmSync(path);
  }

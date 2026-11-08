@@ -2,7 +2,7 @@
 literal:9616166@gmail.com
 literal:kostenchuksergey
 regex:(?:/Users|/home)/[^/\s"']+/Harnessy-Projects(?:/|\b)
-regex:\b[A-Za-z]:\\{1,2}Users\\{1,2}[^\\\r\n"']+\\{1,2}Harnessy-Projects(?:\\{1,2}|\b)
+regex:\b[A-Za-z]:[\\/]{1,2}Users[\\/]{1,2}[^\\/\r\n"']+[\\/]{1,2}Harnessy-Projects(?:[\\/]{1,2}|\b)
 regex:\bsk-[A-Za-z0-9_-]{20,}\b
 regex:\bgh[pousr]_[A-Za-z0-9_]{20,}\b
 regex:\bgithub_pat_[A-Za-z0-9_]{20,}\b
