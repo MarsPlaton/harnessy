@@ -19,7 +19,7 @@ test('21b sandbox: child writes through absolute, traversal and symlink paths ca
  const write=await sandboxedShell(request(project.dir,'printf own > result; printf temp > "$TMPDIR/result"; printf "%s" "$TMPDIR"'),ready());assert.equal(write.code,0);assert.equal(readFileSync(join(project.dir,'result'),'utf8'),'own');assert.equal(existsSync(write.stdout),false);
 });
 
-test('21b sandbox: private temporary directory is 0700 and removed on success, failure and cancellation',async t=>{
+test('21b sandbox: private temporary directory is 0700 and removed on success, failure and cancellation',{skip:process.platform!=='darwin'},async t=>{
  const project=agentFixture(t);
  for(const outcome of ['success','failure','cancel']){let temporary='';const controller=new AbortController();
   const job=sandboxedShell(request(project.dir,'unused'),controller.signal,async(req,signal)=>{temporary=req.env!.TMPDIR!;assert.equal(statSync(temporary).mode&0o777,0o700);assert.equal(req.env!.TMP,temporary);assert.equal(req.env!.TEMP,temporary);assert.equal(req.binary,'/usr/bin/sandbox-exec');assert.ok(req.args[1]!.includes(project.dir));writeFileSync(join(temporary,'fixture'),'temporary');
@@ -29,10 +29,16 @@ test('21b sandbox: private temporary directory is 0700 and removed on success, f
  }
 });
 
-test('21b sandbox: unavailable protection refuses without falling back to an unconfined shell',async t=>{
+test('21b sandbox: unavailable protection refuses without falling back to an unconfined shell',{skip:process.platform!=='darwin'},async t=>{
  const h=agentFixture(t);let launches=0;const execute=async()=>{launches++;return {stdout:'',stderr:'sandbox-exec: sandbox_init: Operation not permitted',code:1,signal:null}};
  for(const options of [{platform:'linux' as const},{binary:join(h.dir,'missing'),platform:'darwin' as const}])await assert.rejects(sandboxedShell(request(h.dir,'touch unsafe'),ready(),execute,options),{code:'sandbox_unavailable'});
  assert.equal(launches,0);await assert.rejects(sandboxedShell(request(h.dir,'touch unsafe'),ready(),execute,{platform:'darwin'}),{code:'sandbox_unavailable'});assert.equal(launches,1);assert.equal(existsSync(join(h.dir,'unsafe')),false);
+});
+
+test('Windows API-agent shell remains unavailable before any child process starts',{skip:process.platform!=='win32'},async t=>{
+ const h=agentFixture(t);let launches=0;
+ await assert.rejects(sandboxedShell(request(h.dir,'touch unsafe'),ready(),async()=>{launches++;throw Error('unconfined command')},{platform:'win32'}),{code:'sandbox_unavailable'});
+ assert.equal(launches,0);assert.equal(existsSync(join(h.dir,'unsafe')),false);
 });
 
 test('21e sandbox: read-only prevents project writes by children, traversal and symlinks; private temporary writes work',{skip:process.platform!=='darwin'},async t=>{

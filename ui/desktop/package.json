@@ -9,10 +9,12 @@
   "scripts": {
     "start": "electron .",
     "prepare:site": "python3 ../deploy/build.py",
+    "prepare:site:win": "py -3 -X utf8 ../deploy/build.py",
     "prepare:engine": "node build-engine.mjs",
     "prepare:dist": "npm run prepare:site && npm run prepare:engine",
     "dist": "node signing.js && npm run prepare:dist && electron-builder --mac --arm64 --publish never && node verify-signing.js",
-    "dist:x64": "node signing.js && npm run prepare:dist && electron-builder --mac --x64 --publish never && node verify-signing.js"
+    "dist:x64": "node signing.js && npm run prepare:dist && electron-builder --mac --x64 --publish never && node verify-signing.js",
+    "dist:win": "npm run prepare:site:win && npm run prepare:engine && electron-builder --win zip --x64 --publish never"
   },
   "devDependencies": {
     "electron": "44.4.1",

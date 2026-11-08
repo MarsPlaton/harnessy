@@ -36,10 +36,22 @@ flowchart TB
 ## Запуск (сегодня)
 
 ```bash
-~/Harnessy/ui/desktop/run.sh          # движок на 127.0.0.1:3777 (нужны `claude login` и вход Codex)
+~/Harnessy/ui/desktop/run.sh          # движок на 127.0.0.1:3777 (нужны `claude auth login` и вход Codex)
 ~/Harnessy/ui/desktop/electron.sh # окно Electron; если порт молчит, оно само поднимает движок
 npm test                        # строгая сборка всех пакетов + тесты
 ```
+
+### Пробная сборка для Windows (подписки Claude Code и Codex)
+
+Для сборки на Windows x64 нужны Node.js 22+ и Python 3 с командой `py`. Отдельно установите нативные Claude Code и Codex CLI и войдите через терминал командами `claude auth login` и `codex login`. Кнопки входа внутри окна и API-агенты в этот первый этап не входят.
+
+```powershell
+npm ci
+npm --prefix ui/desktop ci
+npm --prefix ui/desktop run dist:win
+```
+
+Результат — **неподписанный ZIP** в `ui/desktop/release/`. Распакуйте его и запустите `Harnessy-alpha.exe`: системный Node.js приложению уже не нужен. Claude и Codex ищутся в `PATH`, включая пути с пробелами. Выполнение команд встроенным API-агентом в Windows недоступно: защита macOS Seatbelt здесь не действует. Хранение API-ключей и управление SSH/прокси пока не перенесены; автообновление для неподписанного архива отключено. Профильные Windows-тесты и запуск упакованного окна проверены, полный набор тестов пока не проходит на Windows.
 
 ## Шесть вопросов об архитектуре
 

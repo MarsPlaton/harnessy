@@ -25,7 +25,7 @@ test('5/14/15/16/71: startup falls back for missing/unreadable/deleted last proj
  const app=await bootstrap(h.options);assert.equal(app.runtime.project.dir,h.env.CHAT_WORK_DIR);assert.ok(existsSync(h.env.HARNESS_PROJECTS_ROOT!));
  const status=await fetch(app.url+'/api/status').then(r=>r.json()) as any;assert.equal(status.auth.claude.error,'claude не найден; задай CLAUDE_BIN');assert.equal(status.models.codex.length,2);
  const root=await fetch(app.url+'/',{redirect:'manual'});assert.equal(root.status,302);assert.equal(root.headers.get('location'),PROTO_ENTRY);await root.text();
- assert.equal((await fetch(app.url+'/sketches/missing')).status,404);assert.ok(h.log.some(s=>s.includes('папки нет — '+h.env.HARNESSY_SITE)));assert.ok(h.log.some(s=>s.includes('НЕТ — выполни в Терминале: claude login')));await app.close()
+ assert.equal((await fetch(app.url+'/sketches/missing')).status,404);assert.ok(h.log.some(s=>s.includes('папки нет — '+h.env.HARNESSY_SITE)));assert.ok(h.log.some(s=>s.includes('НЕТ — выполни в Терминале: claude auth login')));await app.close()
  }
  assert.ok(h.log.some(s=>s.includes('последний проект не прочитан')));assert.ok(h.log.some(s=>s.includes('последняя папка недоступна')))
 });
@@ -59,7 +59,7 @@ describe('323: run.sh variants run serially', {concurrency:false},()=>{
  // Fail on overlapping variants even if a runner or future edit enables concurrency.
  beforeEach(()=>{active++;assert.equal(active,1,'323: launcher variants overlap')});
  afterEach(()=>{assert.equal(active,1,'323: launcher variants overlap');active--});
- for(const via of ['direct','directory link','file link','relative file link'])test('10/17/18/179/180/191: actual ui/desktop/run.sh via '+via+' launches TS, opens the prototype instead of the old window and exits on SIGTERM, duplicate port fails', {timeout:launcherTimeoutMs},async t=>{
+ for(const via of ['direct','directory link','file link','relative file link'])test('10/17/18/179/180/191: actual ui/desktop/run.sh via '+via+' launches TS, opens the prototype instead of the old window and exits on SIGTERM, duplicate port fails', {timeout:launcherTimeoutMs,skip:process.platform==='win32'},async t=>{
  const h=setup(t),trace=join(h.root,'trace'),hook=join(h.root,'providers.mjs'),site=join(h.root,'site');mkdirSync(site);mkdirSync(join(site,'proto'));writeFileSync(join(site,'proto/10-new-chat.html'),'<title>Window</title>');
  // Node's test-only module substitution prevents any SDK process or model call in the child.
  const providers=pathToFileURL(join(repositoryRoot,'packages/providers/src/index.ts')).href;

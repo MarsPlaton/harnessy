@@ -8,9 +8,11 @@ import {object,message,RuntimeError,slice} from './errors.ts';
 import type {Pane,Registry} from './pane.ts';
 import type {Clock} from './types.ts';
 export interface StateIO {read(path:string):string;write(path:string,text:string):void;rename?(from:string,to:string):void}
+// Windows cannot open a directory for fsync; atomicWrite already flushes the file.
+function syncDirectory(path:string){if(process.platform==='win32')return;const fd=openSync(dirname(path),'r');try{fsyncSync(fd)}finally{closeSync(fd)}}
 export const diskIO:StateIO={read:path=>new TextDecoder('utf-8',{fatal:true}).decode(readFileSync(path)),write(path,text){
- mkdirSync(dirname(path),{recursive:true});atomicWrite(path,text);const fd=openSync(dirname(path),'r');try{fsyncSync(fd)}finally{closeSync(fd)}
-},rename(from,to){renameSync(from,to);const fd=openSync(dirname(to),'r');try{fsyncSync(fd)}finally{closeSync(fd)}}};
+ mkdirSync(dirname(path),{recursive:true});atomicWrite(path,text);syncDirectory(path)
+},rename(from,to){renameSync(from,to);syncDirectory(to)}};
 export interface Receipt {turnInstanceId:string;recordSeqs:number[];effectsPending:boolean;interrupted:boolean;nextSeen:Record<string,number>}
 export type TurnOutcome='ok'|'interrupted'|'error';
 export interface ArtifactRefs {project:string;chat:string;turnInstanceId:string;paths:string[]}

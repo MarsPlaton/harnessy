@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {lstatSync,mkdtempSync,readFileSync,readdirSync,readlinkSync,rmSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {homedir,tmpdir} from 'node:os';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 
 export const OWNER_FILE_ENV=['HARNESS_PROJECTS_FILE','HARNESS_LAST_PROJECT_FILE','HARNESS_PINS_FILE','HARNESS_SETTINGS_FILE','HARNESS_CONNECTIONS_FILE'] as const;
@@ -35,9 +35,11 @@ const ownFile=fileURLToPath(import.meta.url),main=process.argv[1]&&resolve(proce
 if(main&&process.argv[2]==='run'){
  // One full run, with isolation installed before test modules load in each worker.
  process.exitCode=checkOwnerFiles(()=>{
-  const build=spawnSync('npm',['run','build'],{stdio:'inherit'});if(build.error)throw build.error;if(build.status!==0)return build.status??1;
+  const npmCli=process.platform==='win32'?process.env.npm_execpath:null;
+  if(process.platform==='win32'&&!npmCli)throw Error('Windows test runner requires npm execpath');
+  const build=spawnSync(npmCli?process.execPath:'npm',[...(npmCli?[npmCli]:[]),'run','build'],{stdio:'inherit'});if(build.error)throw build.error;if(build.status!==0)return build.status??1;
   process.env.HARNESSY_TEST_SITE=buildTestSite();
-  const tests=spawnSync(process.execPath,['--import',ownFile,'--test','packages/*/src/**/*.test.ts'],{stdio:'inherit'});if(tests.error)throw tests.error;return tests.status??1;
+  const tests=spawnSync(process.execPath,['--import',pathToFileURL(ownFile).href,'--test','packages/*/src/**/*.test.ts'],{stdio:'inherit'});if(tests.error)throw tests.error;return tests.status??1;
  });
 }else{
  const directory=mkdtempSync(join(tmpdir(),'harnessy-test-owner-'));

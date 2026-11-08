@@ -18,6 +18,7 @@ import {promoteChat,restorePromotions,type PromotionInput} from './promotion.ts'
 import {propose,proposals,confirm,create,createOwnerSeat,proposeOwner,restoreProposals,type ProposalInput,type ProposalRef,type OwnerSeatInput} from './proposals.ts';
 import {reserve,free,waiting,waitingError,locked} from './operations.ts';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
+import {homedir} from 'node:os';
 import {AttachmentStore,expandUser,initProject,projectsRoot} from '@harnessy/projects';
 import {pyTruthy} from '@harnessy/team';
 import {askDeliveryDepth} from './action-state.ts';
@@ -117,7 +118,7 @@ export class Runtime {
  readonly deps:RuntimeDeps;readonly actions:RuntimeActions;
  constructor(deps:RuntimeDeps,actions:RuntimeActions){this.deps=deps;this.actions=actions;this.llmKeys=deps.llmKeys??new MacKeyStore();this.sshTunnels=deps.sshTunnels??new SshTunnels();
  if(!actions||['ask','merge','assignRole','afterTurn','restorePendingAcks','cancelAsks'].some(k=>typeof (actions as unknown as Record<string,unknown>)[k]!=='function'))throw new RuntimeError('actions_required','порт действий обязателен',500);
- this.clock=deps.clock??systemClock;this.connections=deps.connections??new Connections();this.projectRegistry=deps.projectRegistry??new ProjectRegistry();this.defaultDir=canonicalPath(deps.defaultDir??process.env.CHAT_WORK_DIR??'/Users/Shared/simple-claude-chat');
+ this.clock=deps.clock??systemClock;this.connections=deps.connections??new Connections();this.projectRegistry=deps.projectRegistry??new ProjectRegistry();this.defaultDir=canonicalPath(deps.defaultDir??process.env.CHAT_WORK_DIR??(process.platform==='win32'?join(homedir(),'Harnessy-Projects','Chat'):'/Users/Shared/simple-claude-chat'));
  const current=()=>this.current&&!this.current.closed?this.current.dir:null;
  this.settings=typeof deps.settings==='function'?deps.settings(current):deps.settings??new Settings(undefined,current);
  let savedPrograms:Record<string,unknown>={};try{savedPrograms=this.settings.get().owner}catch{}

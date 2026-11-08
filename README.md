@@ -36,10 +36,22 @@ flowchart TB
 ## Run (today)
 
 ```bash
-~/Harnessy/ui/desktop/run.sh          # engine on 127.0.0.1:3777 (needs `claude login` and a Codex login)
+~/Harnessy/ui/desktop/run.sh          # engine on 127.0.0.1:3777 (needs `claude auth login` and a Codex login)
 ~/Harnessy/ui/desktop/electron.sh # Electron window; it starts the engine itself if the port is silent
 npm test                        # strict build of all packages + tests
 ```
+
+### Windows pilot (Claude Code and Codex subscriptions)
+
+On Windows x64, install Node.js 22+ and Python 3 with the `py` launcher to build. Install the native Claude Code and Codex CLIs separately, and sign in from a terminal with `claude auth login` and `codex login`. Desktop sign-in buttons and API-key agents are outside this pilot.
+
+```powershell
+npm ci
+npm --prefix ui/desktop ci
+npm --prefix ui/desktop run dist:win
+```
+
+The output is an **unsigned ZIP** in `ui/desktop/release/`. Extract it and launch `Harnessy-alpha.exe`; the bundled engine needs no system Node.js. Claude/Codex executables are found on `PATH`, including paths with spaces. The Windows pilot keeps API-agent shell execution unavailable because its macOS Seatbelt protection has no Windows equivalent here. API-key storage and SSH/proxy management have not been ported; automatic updates are disabled for the unsigned Windows archive. This pilot has focused Windows tests and a packaged window smoke test; the full macOS-oriented suite is not yet green on Windows.
 
 ## Six architecture questions
 

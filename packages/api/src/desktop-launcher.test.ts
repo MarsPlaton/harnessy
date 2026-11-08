@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import {runInNewContext} from 'node:vm';
 import {createRequire} from 'node:module';
 import {EventEmitter} from 'node:events';
+import {spawn} from 'node:child_process';
 
 const main=fs.readFileSync(new URL('../../../ui/desktop/main.js',import.meta.url),'utf8');
 const preload=fs.readFileSync(new URL('../../../ui/desktop/preload.js',import.meta.url),'utf8');
@@ -13,7 +14,7 @@ const requireFromTest=createRequire(import.meta.url),{contextMenuTemplate}=requi
 const {recoverProgramPath}=requireFromTest('../../../ui/desktop/path-recovery.js');
 
 test('TS-33: packaged shell PATH is restored before the engine child starts',()=>{
- let calls=0;const pathValue=recoverProgramPath({HOME:'/test/home',PATH:'/usr/bin:/bin',SHELL:'/bin/zsh'},()=>{calls++;return {status:0,stdout:'/test/home/.local/bin:/usr/bin'}});
+ let calls=0;const pathValue=recoverProgramPath({HOME:'/test/home',PATH:'/usr/bin:/bin',SHELL:'/bin/zsh'},()=>{calls++;return {status:0,stdout:'/test/home/.local/bin:/usr/bin'}},'darwin');
  assert.equal(calls,1);assert.equal(pathValue.searched[0],'/test/home/.local/bin');assert.equal(pathValue.source,'login-shell');
 });
 
@@ -57,7 +58,8 @@ test('TS-33: hidden test window never shows or activates the packaged shell',asy
 });
 
 class Child extends EventEmitter {
- exitCode:number|null=null;signalCode:string|null=null;kills:string[]=[];
+ exitCode:number|null=null;signalCode:string|null=null;kills:string[]=[];connected=true;disconnects=0;
+ disconnect(){this.disconnects++;this.connected=false;this.exitCode=0;queueMicrotask(()=>this.emit('exit',0,null))}
  kill(signal:string){this.kills.push(signal);this.signalCode=signal;queueMicrotask(()=>this.emit('exit',null,signal));return true}
 }
 
@@ -68,23 +70,31 @@ test('TS-30: packaged engine uses Electron Node, skips an occupied port and stop
  const manager=new EngineManager({paths:{engineRoot,entry,site},execPath:'/Applications/Harnessy-alpha.app/Contents/MacOS/Harnessy-alpha',env:{PATH:'/usr/bin:/bin'},logDirectory:logs,
   portAvailable:async(port:number)=>port!==3777,fetch:async()=>({ok:launches.length>0}),spawn:(file:string,args:string[],options:any)=>{const child=new Child();launches.push({file,args,options,child});return child}});
  const result=await manager.start();assert.equal(result.port,3778);assert.equal(result.url,'http://127.0.0.1:3778/sketches/proto/10-new-chat.html');assert.equal(launches.length,1);
- const launch=launches[0]!;assert.equal(launch.file,'/Applications/Harnessy-alpha.app/Contents/MacOS/Harnessy-alpha');assert.deepEqual(launch.args,[entry]);assert.equal(launch.options.detached,false);assert.equal(launch.options.shell,false);assert.equal(launch.options.env.ELECTRON_RUN_AS_NODE,'1');assert.equal(launch.options.env.PORT,'3778');assert.equal(launch.options.env.HARNESSY_SITE,site);assert.equal(launch.options.stdio[3],'ipc');assert.equal(fs.statSync(path.join(logs,'server-desktop.log')).mode&0o777,0o600);
- const restarted=await manager.restart();assert.equal(restarted.port,3778);assert.equal(launches.length,2);assert.deepEqual(launch.child.kills,['SIGTERM']);
- await manager.stop();assert.deepEqual(launches[1]!.child.kills,['SIGTERM']);
+ const launch=launches[0]!;assert.equal(launch.file,'/Applications/Harnessy-alpha.app/Contents/MacOS/Harnessy-alpha');assert.deepEqual(launch.args,[entry]);assert.equal(launch.options.detached,false);assert.equal(launch.options.shell,false);assert.equal(launch.options.env.ELECTRON_RUN_AS_NODE,'1');assert.equal(launch.options.env.PORT,'3778');assert.equal(launch.options.env.HARNESSY_SITE,site);assert.equal(launch.options.stdio[3],'ipc');if(process.platform!=='win32')assert.equal(fs.statSync(path.join(logs,'server-desktop.log')).mode&0o777,0o600);
+ const restarted=await manager.restart();assert.equal(restarted.port,3778);assert.equal(launches.length,2);assert.equal(launch.child.disconnects,process.platform==='win32'?1:0);assert.deepEqual(launch.child.kills,process.platform==='win32'?[]:['SIGTERM']);
+ await manager.stop();assert.equal(launches[1]!.child.disconnects,process.platform==='win32'?1:0);assert.deepEqual(launches[1]!.child.kills,process.platform==='win32'?[]:['SIGTERM']);
 });
 
 test('TS-30: external development URL does not start a child and packaged paths stay inside Resources',async()=>{
  let spawned=false;const manager=new EngineManager({externalUrl:'http://127.0.0.1:4555/custom',fetch:async()=>({ok:true}),spawn:()=>{spawned=true;throw Error('unexpected')}});
  assert.deepEqual(await manager.start(),{origin:'http://127.0.0.1:4555',url:'http://127.0.0.1:4555/custom',managed:false});assert.equal(spawned,false);
  const packaged=defaultPaths('/app.asar','/Bundle/Contents/Resources',true),development=defaultPaths('/repo/ui/desktop','/unused',false);
- assert.equal(packaged.entry,'/Bundle/Contents/Resources/engine/node_modules/@harnessy/api/dist/bin/harnessy.js');assert.equal(packaged.site,'/Bundle/Contents/Resources/site/sketches');assert.equal(development.site,'/repo/ui/deploy/out/site/sketches');
+ assert.equal(packaged.entry,path.join('/Bundle/Contents/Resources','engine/node_modules/@harnessy/api/dist/bin/harnessy.js'));assert.equal(packaged.site,path.join('/Bundle/Contents/Resources','site/sketches'));assert.equal(development.site,path.resolve('/repo/ui/desktop','../deploy/out/site/sketches'));
 });
 
 test('TS-30: stop during readiness cancels that launch without spawning a replacement',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'harnessy-desktop-stop-')),engineRoot=path.join(root,'engine'),entry=path.join(engineRoot,'api.js');fs.mkdirSync(engineRoot,{recursive:true});fs.writeFileSync(entry,'');t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const children:Child[]=[];const manager=new EngineManager({paths:{engineRoot,entry,site:root},logDirectory:path.join(root,'logs'),readyAttempts:50,readyWaitMs:1,portAvailable:async()=>true,fetch:async()=>({ok:false}),spawn:()=>{const child=new Child();children.push(child);return child}});
  const start=manager.start(),rejected=assert.rejects(start,/запуск движка отменён/);while(children.length===0)await new Promise(resolve=>setTimeout(resolve,0));await manager.stop();await rejected;await new Promise(resolve=>setTimeout(resolve,5));
- assert.equal(children.length,1);assert.deepEqual(children[0]!.kills,['SIGTERM']);
+ assert.equal(children.length,1);assert.equal(children[0]!.disconnects,process.platform==='win32'?1:0);assert.deepEqual(children[0]!.kills,process.platform==='win32'?[]:['SIGTERM']);
+});
+
+test('Windows desktop shutdown asks the real engine child to close through IPC',{skip:process.platform!=='win32'},async()=>{
+ const child=spawn(process.execPath,['-e','process.send("READY");process.on("disconnect",()=>{require("node:fs").writeSync(1,"GRACEFUL");process.exit(0)})'],{stdio:['ignore','pipe','pipe','ipc']});
+ let output='';child.stdout!.on('data',chunk=>output+=chunk);
+ await new Promise<void>((resolve,reject)=>{child.once('message',()=>resolve());child.once('error',reject)});
+ const manager=new EngineManager({stopTimeoutMs:2000});await manager.stopChild(child);
+ assert.equal(child.exitCode,0);assert.equal(output,'GRACEFUL');
 });
 
 test('TS-30: desktop shutdown owns the child and clean first launch keeps the TS-19 path',()=>{

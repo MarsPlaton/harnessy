@@ -44,6 +44,11 @@ mac:
     - target: zip
       arch: [arm64]
 artifactName: Harnessy-alpha-${version}-${arch}.${ext}
+win:
+  signAndEditExecutable: false
+  target:
+    - target: zip
+      arch: [x64]
 generateUpdatesFilesForAllChannels: true
 # Owner confirmation is required before enabling checks or publishing.
 publish:

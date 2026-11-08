@@ -47,7 +47,11 @@ run(process.execPath,[tsc,'-p',join(here,'tsconfig.engine.json')],{cwd:root});
 
 mkdirSync(engine,{recursive:true});
 for(const name of ['package.json','package-lock.json'])cpSync(join(here,'runtime',name),join(engine,name));
-if(!skipInstall)run(process.platform==='win32'?'npm.cmd':'npm',['ci','--omit=dev','--ignore-scripts','--no-audit','--no-fund'],{cwd:engine});
+if(!skipInstall){
+  const npmCli=process.platform==='win32'?process.env.npm_execpath:null;
+  if(process.platform==='win32'&&!npmCli)throw new Error('Windows engine build requires npm execpath');
+  run(npmCli?process.execPath:'npm',[...(npmCli?[npmCli]:[]),'ci','--omit=dev','--ignore-scripts','--no-audit','--no-fund'],{cwd:engine});
+}
 mkdirSync(join(engine,'node_modules','@harnessy'),{recursive:true});
 
 const packages=readdirSync(join(root,'packages'),{withFileTypes:true}).filter(entry=>entry.isDirectory()&&existsSync(join(root,'packages',entry.name,'package.json'))).map(entry=>entry.name).sort();

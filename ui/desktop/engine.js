@@ -130,7 +130,8 @@ class EngineManager {
   async stopChild(child){
     if(child.exitCode!==null||child.signalCode!==null)return;
     const exited=waitForExit(child);
-    child.kill('SIGTERM');
+    try{if(process.platform==='win32'&&child.connected)child.disconnect();else child.kill('SIGTERM')}
+    catch{child.kill('SIGTERM')}
     const graceful=await Promise.race([exited.then(()=>true),delay(this.options.stopTimeoutMs??5000,this.options.setTimeout).then(()=>false)]);
     if(!graceful&&child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await exited}
   }

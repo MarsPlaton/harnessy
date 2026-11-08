@@ -14,8 +14,8 @@ const root=fileURLToPath(new URL('../../../',import.meta.url));
 const guard=join(root,'ui/deploy/forbidden_guard.py');
 const markers=join(root,'ui/deploy/forbidden-strings.txt');
 const require=createRequire(import.meta.url);
-const afterPack=require(join(root,'ui/desktop/after-pack.cjs')) as (context:{appOutDir:string;packager:{appInfo:{productFilename:string}}})=>Promise<void>;
-const runGuard=(path:string)=>spawnSync('python3',[guard,path],{cwd:root,encoding:'utf8'});
+const afterPack=require(join(root,'ui/desktop/after-pack.cjs')) as (context:{appOutDir:string;electronPlatformName?:string;packager:{appInfo:{productFilename:string}}})=>Promise<void>;
+const runGuard=(path:string)=>process.platform==='win32'?spawnSync('py',['-3','-X','utf8',guard,path],{cwd:root,encoding:'utf8'}):spawnSync('python3',[guard,path],{cwd:root,encoding:'utf8'});
 const crc32=(data:Buffer)=>{let crc=0xffffffff;for(const value of data){crc^=value;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return (crc^0xffffffff)>>>0};
 const pngChunk=(kind:string,body:Buffer)=>{const name=Buffer.from(kind),out=Buffer.alloc(body.length+12);out.writeUInt32BE(body.length);name.copy(out,4);body.copy(out,8);out.writeUInt32BE(crc32(Buffer.concat([name,body])),out.length-4);return out};
 const pngText=(kind:'zTXt'|'iTXt',text:string)=>{const ihdr=Buffer.from('00000001000000010806000000','hex'),packed=deflateSync(Buffer.from(text)),metadata=kind==='zTXt'?Buffer.concat([Buffer.from('Comment\0\0'),packed]):Buffer.concat([Buffer.from('Comment\0'),Buffer.from([1,0,0,0]),packed]);return Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),pngChunk('IHDR',ihdr),pngChunk(kind,metadata),pngChunk('IDAT',deflateSync(Buffer.from([0,0,0,0,255]))),pngChunk('IEND',Buffer.alloc(0))])};
@@ -26,9 +26,9 @@ const asar=(files:Record<string,Buffer>)=>{let offset=0;const body:Buffer[]=[],e
 test('TS-32: one marker list rejects owner data, absolute project roots and credential-shaped values with the file name',t=>{
  const dir=mkdtempSync(join(tmpdir(),'harnessy-ts32-guard-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));mkdirSync(join(dir,'nested'));
  writeFileSync(join(dir,'masked.txt'),'you@example.com\nsk-…8f2a\n~/Harnessy-Projects\n');assert.equal(runGuard(dir).status,0);
- const cases:ReadonlyArray<readonly [string,string]>=[['profile.html','9616166@gmail.com'],['home.txt','/Users/tester/Harnessy-Projects/demo'],['token.js','const access_token="sk-live-0123456789abcdefghijklmnop"']];
+ const cases:ReadonlyArray<readonly [string,string]>=[['profile.html','9616166@gmail.com'],['home.txt','/Users/tester/Harnessy-Projects/demo'],['windows-home.txt','C:\\Users\\Test Owner\\Harnessy-Projects\\private'],['windows-json.txt',JSON.stringify({project:'C:\\Users\\Test Owner\\Harnessy-Projects\\private'})],['token.js','const access_token="sk-live-0123456789abcdefghijklmnop"']];
  for(const [name,value] of cases){
-  const path=join(dir,'nested',name);writeFileSync(path,value);const blocked=runGuard(dir);assert.equal(blocked.status,1,name);assert.match(blocked.stderr,new RegExp('nested/'+name.replace('.','\\.')));assert.doesNotMatch(blocked.stderr,/9616166|sk-live-0123456789/);rmSync(path);
+  const path=join(dir,'nested',name);writeFileSync(path,value);const blocked=runGuard(dir);assert.equal(blocked.status,1,name);assert.match(blocked.stderr.replaceAll('\\','/'),new RegExp('nested/'+name.replace('.','\\.')));assert.doesNotMatch(blocked.stderr,/9616166|sk-live-0123456789/);rmSync(path);
  }
  const list=readFileSync(markers,'utf8');assert.match(list,/literal:kostenchuksergey/);assert.match(list,/PRIVATE KEY/);
 });
@@ -39,9 +39,17 @@ test('TS-32: build.py and electron-builder afterPack use the same guard; bundled
  await afterPack({appOutDir:out,packager:{appInfo:{productFilename:'Harnessy-alpha'}}});writeFileSync(join(resources,'engine.js'),'github_pat_0123456789abcdefghijklmnop');await assert.rejects(afterPack({appOutDir:out,packager:{appInfo:{productFilename:'Harnessy-alpha'}}}),/engine\.js/);
 });
 
+test('Windows afterPack checks the actual resources directory and rejects embedded secrets',async t=>{
+ const out=mkdtempSync(join(tmpdir(),'harnessy-win-pack-')),resources=join(out,'resources');t.after(()=>rmSync(out,{recursive:true,force:true}));mkdirSync(resources);
+ const context={appOutDir:out,electronPlatformName:'win32',packager:{appInfo:{productFilename:'Harnessy-alpha'}}};
+ writeFileSync(join(resources,'main.js'),'clean fixture');await afterPack(context);
+ writeFileSync(join(resources,'main.js'),'C:\\Users\\Test Owner\\Harnessy-Projects\\private');await assert.rejects(afterPack(context),/main\.js/);
+ writeFileSync(join(resources,'main.js'),'github_pat_0123456789abcdefghijklmnop');await assert.rejects(afterPack(context),/main\.js/);
+});
+
 test('TS-32 r2: guard opens names, PNG text, UTF-16, gzip in ASAR and refuses unknown or oversized containers',{timeout:30000},t=>{
  const dir=mkdtempSync(join(tmpdir(),'harnessy-ts32-containers-')),nested=join(dir,'nested'),marker='kostenchuksergey';t.after(()=>rmSync(dir,{recursive:true,force:true}));mkdirSync(nested);
- const blocked=(name:string,data:Buffer,reason:RegExp=/маркер/)=>{const path=join(nested,name);writeFileSync(path,data);const result=runGuard(dir);rmSync(path);assert.equal(result.status,1,name);assert.match(result.stderr,new RegExp('nested/'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),name);assert.match(result.stderr,reason,name)};
+ const blocked=(name:string,data:Buffer,reason:RegExp=/маркер/)=>{const path=join(nested,name);writeFileSync(path,data);const result=runGuard(dir);rmSync(path);assert.equal(result.status,1,name);assert.match(result.stderr.replaceAll('\\','/'),new RegExp('nested/'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),name);assert.match(result.stderr,reason,name)};
  blocked(marker+'.txt',Buffer.from('clean'));
  blocked('compressed-z.png',pngText('zTXt',marker));
  blocked('compressed-i.png',pngText('iTXt',marker));

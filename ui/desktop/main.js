@@ -24,7 +24,7 @@ const engine=new EngineManager({
 let currentOrigin='';
 let allowQuit=false,stopping=false;
 const updates=new DesktopUpdates({
-  updater:autoUpdater,packaged:app.isPackaged,file:path.join(app.getPath('userData'),'updates.json'),
+  updater:autoUpdater,packaged:app.isPackaged&&process.platform==='darwin',file:path.join(app.getPath('userData'),'updates.json'),
   notify:state=>BrowserWindow.getAllWindows().forEach(win=>{if(!win.isDestroyed())win.webContents.send('harnessy:update-state',state)}),
   stopEngine:()=>engine.stop(),resumeEngine:async()=>{
     const launch=await engine.start(),previous=currentOrigin;
@@ -48,7 +48,7 @@ const offline=reason=>'data:text/html;charset=utf-8,'+encodeURIComponent(
   .e{font:10.5px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#c27a34;margin-bottom:10px}
   h1{font-size:22px;margin:0 0 8px;letter-spacing:-.01em}p{color:#9a9aa2;margin:0 0 6px}code{color:#d89c54}</style></head>
   <body><div class="c"><div class="e">Harnessy · alpha</div><h1>Движок не запустился</h1>
-  <p>${html(reason)}</p><p>Подробности: <code>~/.harnessy/server-desktop.log</code></p><p>После исправления нажмите ⌘R.</p></div></body></html>`);
+  <p>${html(reason)}</p><p>Подробности: <code>${html(path.join(os.homedir(),'.harnessy','server-desktop.log'))}</code></p><p>После исправления нажмите ${process.platform==='win32'?'Ctrl+R':'⌘R'}.</p></div></body></html>`);
 
 const {contextMenuTemplate}=require('./context-menu.js');
 const contextMeta=new WeakMap();
