@@ -15,7 +15,7 @@ const guard=join(root,'ui/deploy/forbidden_guard.py');
 const markers=join(root,'ui/deploy/forbidden-strings.txt');
 const require=createRequire(import.meta.url);
 const afterPack=require(join(root,'ui/desktop/after-pack.cjs')) as (context:{appOutDir:string;electronPlatformName?:string;packager:{appInfo:{productFilename:string}}})=>Promise<void>;
-const runGuard=(path:string)=>process.platform==='win32'?spawnSync('py',['-3','-X','utf8',guard,path],{cwd:root,encoding:'utf8'}):spawnSync('python3',[guard,path],{cwd:root,encoding:'utf8'});
+const runGuard=(path:string)=>process.platform==='win32'?spawnSync('python',['-X','utf8',guard,path],{cwd:root,encoding:'utf8'}):spawnSync('python3',[guard,path],{cwd:root,encoding:'utf8'});
 const crc32=(data:Buffer)=>{let crc=0xffffffff;for(const value of data){crc^=value;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return (crc^0xffffffff)>>>0};
 const pngChunk=(kind:string,body:Buffer)=>{const name=Buffer.from(kind),out=Buffer.alloc(body.length+12);out.writeUInt32BE(body.length);name.copy(out,4);body.copy(out,8);out.writeUInt32BE(crc32(Buffer.concat([name,body])),out.length-4);return out};
 const pngText=(kind:'zTXt'|'iTXt',text:string)=>{const ihdr=Buffer.from('00000001000000010806000000','hex'),packed=deflateSync(Buffer.from(text)),metadata=kind==='zTXt'?Buffer.concat([Buffer.from('Comment\0\0'),packed]):Buffer.concat([Buffer.from('Comment\0'),Buffer.from([1,0,0,0]),packed]);return Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),pngChunk('IHDR',ihdr),pngChunk(kind,metadata),pngChunk('IDAT',deflateSync(Buffer.from([0,0,0,0,255]))),pngChunk('IEND',Buffer.alloc(0))])};

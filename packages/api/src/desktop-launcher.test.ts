@@ -105,6 +105,10 @@ test('TS-30: desktop shutdown owns the child and clean first launch keeps the TS
 
 test('TS-30 r2: alpha acknowledgement is exact-version owner state independent of runtime port',async()=>{
  const release=requireFromTest('../../../ui/deploy/release.js'),settings:Record<string,unknown>={},calls:{origin:string;path:string;method:string}[]=[];
+ assert.match(release.credentialInfo('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'),/Claude Code и Codex/);
+ assert.doesNotMatch(release.credentialInfo('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'),/macOS/);
+ assert.match(release.credentialInfo('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)'),/связке ключей macOS/);
+ assert.equal(release.escapeHtml('<img src=x onerror="alert(1)">&'), '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&amp;');
  const request=(origin:string)=>async(pathname:string,options:any={})=>{const method=options.method??'GET';calls.push({origin,path:pathname,method});if(method==='POST'){const body=JSON.parse(options.body);Object.assign(settings,body.patch);return {ok:true,json:async()=>({ok:true,saved:{...settings}})}}return {ok:true,json:async()=>({ok:true,owner:{...settings}})}};
  const a={channel:'alpha',version:'0.1.0-alpha',label:'alpha · 0.1.0'},b={channel:'alpha',version:'0.1.1-alpha',label:'alpha · 0.1.1'};
  assert.equal(await release.accepted(request('http://127.0.0.1:3778'),a),false);assert.equal(await release.remember(request('http://127.0.0.1:3778'),a),true);

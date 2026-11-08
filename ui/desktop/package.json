@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "prepare:site": "python3 ../deploy/build.py",
-    "prepare:site:win": "py -3 -X utf8 ../deploy/build.py",
+    "prepare:site:win": "python -X utf8 ../deploy/build.py",
     "prepare:engine": "node build-engine.mjs",
     "prepare:dist": "npm run prepare:site && npm run prepare:engine",
     "dist": "node signing.js && npm run prepare:dist && electron-builder --mac --arm64 --publish never && node verify-signing.js",

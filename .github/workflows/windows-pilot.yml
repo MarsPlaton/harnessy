@@ -1,0 +1,91 @@
+name: Windows subscription pilot
+
+on:
+  push:
+    branches: [windows-native-subscription-pilot]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install project dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install desktop dependencies
+        run: npm --prefix ui/desktop ci --no-audit --no-fund
+      - name: Build TypeScript packages
+        run: npm run build
+      - name: Build and scan site
+        run: python -X utf8 ui/deploy/build.py
+      - name: Test Windows pilot contracts
+        run: |
+          $tests = @(
+            'packages/providers/src/path-recovery.test.ts',
+            'packages/providers/src/login-terminal.test.ts',
+            'packages/runtime/src/agent-sandbox.test.ts',
+            'packages/api/src/bootstrap.test.ts',
+            'packages/api/src/alpha-signup.test.ts',
+            'packages/api/src/attachments.test.ts',
+            'packages/api/src/desktop-launcher.test.ts',
+            'packages/api/src/build-forbidden.test.ts',
+            'packages/api/src/team-live-ui.test.ts',
+            'packages/api/src/tasks.test.ts',
+            'packages/api/src/task-queue-ui.test.ts'
+          )
+          node --import ./packages/projects/src/test-helpers.ts --test --test-concurrency=4 $tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package Windows app
+        run: npm --prefix ui/desktop run dist:win
+      - name: Smoke test packaged engine
+        run: |
+          $resources = (Resolve-Path 'ui/desktop/release/win-unpacked/resources').Path
+          $exe = (Resolve-Path 'ui/desktop/release/win-unpacked/Harnessy-alpha.exe').Path
+          $entry = Join-Path $resources 'engine/node_modules/@harnessy/api/dist/bin/harnessy.js'
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          $env:PORT = '39777'
+          $env:HARNESSY_SITE = Join-Path $resources 'site/sketches'
+          $env:CHAT_WORK_DIR = Join-Path $env:RUNNER_TEMP 'harnessy-ci-project'
+          $env:HARNESS_PROJECTS_ROOT = Join-Path $env:RUNNER_TEMP 'harnessy-ci-projects'
+          $env:HARNESS_PROJECTS_FILE = Join-Path $env:RUNNER_TEMP 'harnessy-ci-projects.json'
+          $env:HARNESS_SETTINGS_FILE = Join-Path $env:RUNNER_TEMP 'harnessy-ci-settings.json'
+          New-Item -ItemType Directory -Path $env:CHAT_WORK_DIR -Force | Out-Null
+          $argument = '"' + $entry + '"'
+          $engine = Start-Process -FilePath $exe -ArgumentList $argument -WindowStyle Hidden -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              if ($engine.HasExited) { throw "Engine exited with code $($engine.ExitCode)" }
+              try {
+                $status = Invoke-RestMethod 'http://127.0.0.1:39777/api/status' -TimeoutSec 2
+                $page = Invoke-WebRequest 'http://127.0.0.1:39777/sketches/proto/10-new-chat.html' -TimeoutSec 2
+                if ($status.project -eq $env:CHAT_WORK_DIR -and $page.StatusCode -eq 200 -and $status.autopilot.available -eq $false) { $ready = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Packaged engine did not serve the isolated project and site' }
+          } finally {
+            if (-not $engine.HasExited) { Stop-Process -Id $engine.Id -Force }
+          }
+      - name: Check packaged resources and ZIP
+        run: |
+          python -X utf8 ui/deploy/forbidden_guard.py ui/desktop/release/win-unpacked/resources
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = (Get-Content -Raw 'ui/desktop/package.json' | ConvertFrom-Json).version
+          $zip = Get-Item -LiteralPath "ui/desktop/release/Harnessy-alpha-$version-x64.zip"
+          if ($zip.Length -lt 100MB) { throw 'Windows ZIP is incomplete' }

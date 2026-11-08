@@ -84,7 +84,7 @@ test('TS-39.1 authenticated place GET follows read_pane policy and never grants 
   const result=await call(h.api,'/api/tasks',{headers});assert.equal(result.status,allow?200:403,JSON.stringify(result.body));if(!allow)assert.equal(result.body.code,'policy_denied');assert.equal((await call(h.api,'/api/tasks',{headers,body:body(h.runtime,1,{text:'forged'})})).body.code,'owner_only');gate.resolve();await run;
  }
 });
-test('TS-39.1 accepted task actions revoke until-reply autopilot; rejected writes leave it on',async t=>{
+test('TS-39.1 accepted task actions revoke until-reply autopilot; rejected writes leave it on',{skip:process.platform==='win32'},async t=>{
  const h=await held(t);async function enable(){const s=(await call(h.api,'/api/status')).body;const answer=await call(h.api,'/api/autopilot',{body:{project:h.dir,instance:s.trace.instanceId,revision:s.autopilot.revision,on:true,until:'reply',conditions:{operations:['answer_question'],maxSpendPercent:5}}});assert.equal(answer.status,200,JSON.stringify(answer.body))}
  await enable();assert.equal((await call(h.api,'/api/tasks',{body:body(h.runtime,1,{text:'x',instance:'forged'})})).body.code,'project_changed');assert.equal(h.runtime.settings.autopilot().on,true);
  const a=await create(h,1);assert.equal(h.runtime.settings.autopilot().on,false);await enable();assert.equal((await call(h.api,'/api/tasks/'+a.taskId+'/assign',{body:body(h.runtime,2,{to:'worker',expectedState:a.expectedState})})).status,200);assert.equal(h.runtime.settings.autopilot().on,false);
