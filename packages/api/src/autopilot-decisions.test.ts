@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {AutopilotDecisionLedger,autopilotDecisionHash,autopilotDecisionId,type AutopilotDecisionBase} from '@harnessy/runtime';
 import {call,fixture,sse,until,OWNER,deferred} from './test-helpers.ts';
 import {promotionInput} from '../../runtime/src/test-helpers.ts';
+import {assertPrivateDirectory} from '@harnessy/team';
 
 const question={id:'journal:14',kind:'question',text:'Продолжать проверку?'};
 const council={orchestrator:{seat:'lead',model:'claude-1',role:'orchestrator' as const},reviewer:{seat:'review',model:'codex-1',role:'reviewer' as const}};
@@ -15,6 +16,15 @@ function decision(project:string):AutopilotDecisionBase {
  return {decisionId:autopilotDecisionId(project,question,proposal,3),issueHash,proposalHash:autopilotDecisionHash(proposal),generation:3,operation:'answer_question',capability,proposal,round:1,question,council};
 }
 const unknownCost={currency:'USD' as const,amount:null,status:'unavailable' as const};
+test('Windows decision ledger keeps the shared .harness ACL and protects only private state',async t=>{
+ if(process.platform!=='win32')return;
+ const project=mkdtempSync(join(tmpdir(),'harnessy-decision-acl-')),harness=join(project,'.harness');t.after(()=>rmSync(project,{recursive:true,force:true}));
+ mkdirSync(harness);const ledger=new AutopilotDecisionLedger(project);
+ assert.throws(()=>assertPrivateDirectory(harness),/unsafe Windows permissions/);
+ await ledger.intent({...decision(project),cost:unknownCost});
+ assert.throws(()=>assertPrivateDirectory(harness),/unsafe Windows permissions/);
+ assert.equal(assertPrivateDirectory(join(harness,'state')).isDirectory(),true);
+});
 function effect(project:string,source:{id:string;kind:string;text:string},operation:string,parameters:Record<string,unknown>,answer:string|null):AutopilotDecisionBase {
  const issueHash=autopilotDecisionHash({project,source,generation:3,revision:1}),capability={id:autopilotDecisionHash({operation,parameters}),operation,parameters};
  const proposal={requestHash:issueHash,capability:capability.id,answer,reason:'Консилиум подтвердил решение'};

@@ -58,6 +58,7 @@ test('176: HTTP prices require owner scope; corrupt settings fail both spend rou
 });
 
 test('175: history rejects a late disk snapshot after project switch',async t=>{
+ if(process.platform==='win32'){t.skip('Windows snapshot reads synchronously, so they cannot outlive a project switch');return}
  const h=await fixture(t);await h.runtime.runTurn('worker','reply');const original=fs.readFile,entered=deferred(),gate=deferred(),path=h.runtime.project.state.chatsPath;t.after(()=>{gate.resolve();t.mock.restoreAll();syncBuiltinESMExports()});
  t.mock.method(fs,'readFile',async(...args:Parameters<typeof fs.readFile>)=>{if(args[0]===path){entered.resolve();await gate.promise}return original(...args)});syncBuiltinESMExports();
  const pending=call(h.api,'/api/spend/turns');await entered.promise;const next=join(h.dir,'next');mkdirSync(next);await h.runtime.projectSet(next,{},OWNER);gate.resolve();const r=await pending;assert.equal(r.status,409);assert.equal(r.body.code,'project_changed');

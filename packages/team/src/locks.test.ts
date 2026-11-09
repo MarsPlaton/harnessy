@@ -1,10 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,realpathSync,rmSync} from 'node:fs';
+import {mkdtempSync,realpathSync,rmSync,writeFileSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
 import {setImmediate as tick} from 'node:timers/promises';
-import {canonicalPath,withPathLock,assertPathLock,type PathLock} from './locks.ts';
+import {atomicWrite,canonicalPath,withPathLock,assertPathLock,type PathLock} from './locks.ts';
 import {ensureLineLocked} from './templates.ts';
 
 test('[r2:1] detached child cannot inherit ownership after release; expired and forged tokens refuse',async()=>{
@@ -24,4 +26,17 @@ test('Windows mixed separators identify the same path before its final directory
   const mixed=root+'\\future/child';
   if(process.platform==='win32')assert.equal(canonicalPath(mixed),canonicalPath(native));
  }finally{rmSync(root,{recursive:true,force:true})}
+});
+
+test('Windows atomic replacement survives a short-lived reader in another process',async()=>{
+ if(process.platform!=='win32')return;
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-rename-'))),path=join(root,'state.json');
+ writeFileSync(path,'before');
+ const child=spawn(process.execPath,['-e',"const fs=require('node:fs');const fd=fs.openSync(process.argv[1],'r');process.stdout.write('ready\\n');setTimeout(()=>fs.closeSync(fd),200)",path],{stdio:['ignore','pipe','pipe'],windowsHide:true});
+ try{
+  await once(child.stdout!,'data');
+  atomicWrite(path,'after');
+  assert.equal(readFileSync(path,'utf8'),'after');
+  const [code]=await once(child,'exit');assert.equal(code,0);
+ }finally{if(child.exitCode===null)child.kill();rmSync(root,{recursive:true,force:true})}
 });

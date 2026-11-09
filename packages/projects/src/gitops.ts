@@ -35,7 +35,7 @@ class LockedGitOps {
  }catch(e){throw new ProjectError('write_failed','не записано: '+String(e),500,e)}
  }
  async ensureWorktree(root:string,seat:string,relPath:string,baseBranch:string):Promise<{path:string|null;note:string|null}>{assertPathLock(this.lock,root);
- const canonicalRoot=canonicalPath(root),path=canonicalPath(join(root,relPath)),rel=relative(canonicalRoot,path),branch='seat/'+seat;
+ const canonicalRoot=canonicalPath(root),path=canonicalPath(root+sep+relPath),rel=relative(canonicalRoot,path),branch='seat/'+seat;
  if(isAbsolute(relPath)||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel))return {path:null,note:'worktree '+relPath+' вне проекта'};
  const belongs=async()=>{const top=await this.repoRoot(path);if(!top||canonicalPath(top)!==path||await this.common(root)!==await this.common(path)||await this.currentBranch(path)!==branch)return false;
  const listed=await this.run(['worktree','list','--porcelain','-z'],root);return listed.code===0&&listed.stdout.split('\0').some(line=>line.startsWith('worktree ')&&canonicalPath(line.slice(9))===path)};

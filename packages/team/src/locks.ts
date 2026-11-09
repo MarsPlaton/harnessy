@@ -29,6 +29,12 @@ export async function withPathLock<T>(path:string,fn:(lock:PathLock)=>T|Promise<
 }
 export function atomicWrite(path:string,text:string,replace:(from:string,to:string)=>void=renameSync):void {
  const target=canonicalPath(path),temp=target+'.'+randomUUID()+'.tmp';let fd:number|undefined;
- try{fd=openSync(temp,'wx');writeFileSync(fd,text,'utf8');fsyncSync(fd);closeSync(fd);fd=undefined;replace(temp,target)}
+ try{fd=openSync(temp,'wx');writeFileSync(fd,text,'utf8');fsyncSync(fd);closeSync(fd);fd=undefined;
+  for(let attempt=0;;attempt++)try{replace(temp,target);break}catch(error){
+   const code=(error as NodeJS.ErrnoException).code;
+   if(process.platform!=='win32'||!['EPERM','EACCES'].includes(String(code))||attempt>=9)throw error;
+   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
+  }
+ }
  finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}}
 }

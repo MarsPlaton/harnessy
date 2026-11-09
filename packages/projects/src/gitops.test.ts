@@ -32,6 +32,7 @@ test('[10-12,22] real worktree ownership, branch, symlink boundary and repeated 
  const foreign=join(t.root,'foreign');mkdirSync(foreign);seedRepo(foreign);assert.match((await g.ensureWorktree(t.root,'foreign','foreign','main')).note!,/не worktree этого репозитория/);
  mkdirSync(join(t.root,'plain'));assert.match((await g.ensureWorktree(t.root,'plain','plain','main')).note!,/не worktree/);
  symlinkSync(outside.root,join(t.root,'outside'),process.platform==='win32'?'junction':'dir');assert.equal((await g.ensureWorktree(t.root,'outside','outside/new','main')).note,'worktree outside/new вне проекта');
+ assert.equal((await g.ensureWorktree(t.root,'outside-parent','outside/../new','main')).note,'worktree outside/../new вне проекта');
  const nested=join(t.root,'plain'),o=await openProjectGit(nested,[seat],'main',g);assert.equal(o.repoRoot,null);assert.ok(o.lineErrors.some(x=>x.includes('чужого git-репозитория')));
  }finally{t.close();outside.close()}
 });
