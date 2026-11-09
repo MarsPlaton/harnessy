@@ -10,7 +10,7 @@ app.whenReady().then(async()=>{
  const win=new BrowserWindow({width:1440,height:900,show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
  win.webContents.session.webRequest.onBeforeRequest((request,done)=>done({cancel:/^https?:/.test(request.url)&&!request.url.startsWith(base+'/')}));
  const evaluate=code=>win.webContents.executeJavaScript(code,true);
- const wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('Boolean('+expression+')'))return;await new Promise(resolve=>setTimeout(resolve,50))}throw Error('Timed out: '+expression)};
+ const wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('Boolean('+expression+')'))return;await new Promise(resolve=>setTimeout(resolve,50))}const state=await evaluate("({current:LIVE.H.cur&&Object.keys(LIVE.H.cur),chatLength:LIVE.S.chat.length,tail:LIVE.S.chat.slice(-3).map(m=>({role:m.role,src:m.src,text:m.text?.slice(0,80),html:m.html?.slice(0,600),queued:m.queued})),paneBusy:LIVE.H.pane?.busy,waiting:LIVE.H.pane?.waiting,link:LIVE.H.link,pending:document.documentElement.hasAttribute('data-live-pending')})");throw Error('Timed out: '+expression+'; state='+JSON.stringify(state))};
  await win.loadURL(base+'/sketches/proto/01-chat.html');
  await wait("window.LIVE?.H.on&&!LIVE.H.snapshotOnly&&!document.documentElement.hasAttribute('data-live-pending')");
  await evaluate("(async()=>{LIVE.S.ui.pane='worker';LIVE.S.ui.direct={worker:true};LIVE.pickPane();LIVE.hStatus();await LIVE.loadChat({onboard:false});CX.render()})()");

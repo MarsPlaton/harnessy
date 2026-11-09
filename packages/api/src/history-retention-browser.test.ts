@@ -21,5 +21,5 @@ test('TS-47.8: real completion keeps old selection and focus when the history is
  const env:NodeJS.ProcessEnv={...process.env,HARNESSY_TEST_WINDOW:'hidden',RETENTION_BROWSER_BASE:api.url,RETENTION_BROWSER_USER_DATA:join(h.dir,'retention-electron')};delete env.ELECTRON_RUN_AS_NODE;
  const child=spawn(electron,[fileURLToPath(new URL('./history-retention-browser-driver.cjs',import.meta.url))],{env,stdio:['ignore','pipe','pipe']});t.after(()=>{if(child.exitCode===null)child.kill('SIGTERM')});let stdout='',stderr='';const released=new Set<number>();
  child.stdout.on('data',data=>{stdout+=data;for(let i=0;i<gates.length;i++)if(!released.has(i)&&stdout.includes('RELEASE_'+i)){released.add(i);gates[i]!.resolve()}});child.stderr.on('data',data=>{stderr+=data});
- const exit=await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve)});assert.equal(exit,0,'browser regression failed: '+stderr+'\n'+stdout);assert.equal(released.size,4);await r.idle();
+ const exit=await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve)});assert.equal(exit,0,'browser regression failed: '+stderr+'\n'+stdout+'; provider runs='+runs);assert.equal(released.size,4);await r.idle();
 });

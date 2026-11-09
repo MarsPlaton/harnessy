@@ -38,7 +38,7 @@ for(const period of ['', '0','007','week','7&period=30'])test('126: invalid peri
  const h=await fixture(t),r=await call(h.api,'/api/spend?period='+period);assert.equal(r.status,400);assert.deepEqual(r.body,{ok:false,code:'period_invalid',error:'period: ожидается 7, 30, 90 или all'});
 });
 
-test('114/126: changing project during the file read discards the previous project result',async t=>{
+test('114/126: changing project during the file read discards the previous project result',{skip:process.platform==='win32'?'Windows reads the snapshot synchronously to keep atomic replacement available':false},async t=>{
  const h=await fixture(t);await h.runtime.runTurn('worker','old result');const entered=deferred(),gate=deferred(),original=fs.readFile,path=h.runtime.project.state.chatsPath;
  t.after(()=>{gate.resolve();t.mock.restoreAll();syncBuiltinESMExports()});
  t.mock.method(fs,'readFile',async(...args:Parameters<typeof fs.readFile>)=>{if(args[0]===path){entered.resolve();await gate.promise}return original(...args)});syncBuiltinESMExports();

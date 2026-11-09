@@ -32,6 +32,6 @@ export function call(api:Api,path:string,options:{method?:string;body?:unknown;r
  })}
 export async function sse(api:Api,id='all',options:{signal?:AbortSignal}={}){
  let req!:ClientRequest;const response=await new Promise<IncomingMessage>((resolve,reject)=>{req=clientRequest(api,'/api/events/'+id,{signal:options.signal??clientSignals.get(api)},resolve);req.on('error',reject);req.end()});
- let raw='';const frames:any[]=[];response.on('error',()=>{});response.on('data',chunk=>{raw+=chunk.toString();for(const block of chunk.toString().split('\n\n')){if(block.startsWith('data: '))try{frames.push(JSON.parse(block.slice(6)))}catch{}}});
+ let raw='',pending='';const decoder=new TextDecoder(),frames:any[]=[];response.on('error',()=>{});response.on('data',chunk=>{const text=decoder.decode(chunk,{stream:true});raw+=text;pending+=text;let end;while((end=pending.indexOf('\n\n'))!==-1){const block=pending.slice(0,end);pending=pending.slice(end+2);if(block.startsWith('data: '))try{frames.push(JSON.parse(block.slice(6)))}catch{}}});
  return {req,response,frames,get raw(){return raw},close(){req.destroy();response.destroy()}}
 }

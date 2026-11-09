@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {parseCompat} from '@harnessy/journal';
@@ -27,7 +28,8 @@ async function readSpend(runtime:Runtime,query:URLSearchParams){
  const period=raw as Period,p=runtime.project,now=runtime.clock.now(),since=period==='all'?null:(now-Number(period)*86_400_000)/1000;
  const prices=new Map(runtime.settings.priceList().map(entry=>[pair(entry.vendor,entry.model),entry]));
  let data:unknown;
- try{data=parseCompat(new TextDecoder('utf-8',{fatal:true}).decode(await readFile(join(p.dir,'.harness','state','chats.json'))))}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')data={chats:{}};else return fail(text(error))}
+ // Windows readers can hold chats.json open across an await and prevent atomic rename by the turn writer.
+ try{const path=join(p.dir,'.harness','state','chats.json'),bytes=process.platform==='win32'?readFileSync(path):await readFile(path);data=parseCompat(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')data={chats:{}};else return fail(text(error))}
  if(p.closed||runtime.project!==p)throw new RuntimeError('project_changed','проект сменился',409);
  if(!object(data)||!object(data.chats))return fail('неверная форма');
  const local=new Map<string,Candidate>();let transferred=0,unknownOrigin=0,undated=0;
