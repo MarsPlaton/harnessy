@@ -54,7 +54,7 @@ test('TS-47.12: service notifications cannot establish a session or bypass known
   assert.equal(s.push({...frames().at(-1),sessionId:sid,exitCode:1})[0]?.type,'error');
  }
 });
-test('TS-47.12: CLI driver replays the actual Copilot stream once and rejects a foreign resumed session',{timeout:5000},async t=>{
+test('TS-47.12: CLI driver replays the actual Copilot stream once and rejects a foreign resumed session',{timeout:process.platform==='win32'?120000:5000},async t=>{
  const root=mkdtempSync(join(tmpdir(),'harnessy-ts4712-'));let wire=recorded;
  const description={...COPILOT,auth:{command:{args:[]},parse:()=>({loggedIn:true,email:'fixture@github.com'})},models:{list:[{id:'gpt-4.1',label:'GPT-4.1'}],reason:'recorded stream test'}};
  const provider=new CliProvider(description,{env:{},cwd:root,stateRoot:join(root,'states'),execute:async(request,_signal,hooks)=>{

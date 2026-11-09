@@ -34,7 +34,9 @@ for(const data of ['[1]', '{', '{"active":true}', '{"active":"FIXTURE-SECRET"}',
 });
 test('285: account metadata symlink/directory is an error; neighbouring OAuth/settings files are not used',async t=>{
  const h=geminiFixture(t),oauth=join(h.config,'oauth_creds.json');writeFileSync(oauth,JSON.stringify({active:'secret@example.test',access_token:'FIXTURE-SECRET'}));writeFileSync(join(h.config,'settings.json'),JSON.stringify({mcpServers:{foreign:{command:'do-not-run'}}}));
- const catalog=new ProviderCatalog([h.entry]);symlinkSync(oauth,h.account);assert.equal((await catalog.read('gemini')).row.login.state,'error');unlinkSync(h.account);mkdirSync(h.account);assert.equal((await catalog.read('gemini')).row.login.state,'error');assert.match(readFileSync(oauth,'utf8'),/FIXTURE-SECRET/);assert.deepEqual(h.capture().map(c=>c.args),[['--version'],['--version']]);
+ const catalog=new ProviderCatalog([h.entry]);let linked=true;try{symlinkSync(oauth,h.account)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM')linked=false;else throw e}
+ if(linked){assert.equal((await catalog.read('gemini')).row.login.state,'error');unlinkSync(h.account)}
+ mkdirSync(h.account);assert.equal((await catalog.read('gemini')).row.login.state,'error');assert.match(readFileSync(oauth,'utf8'),/FIXTURE-SECRET/);assert.deepEqual(h.capture().map(c=>c.args),linked?[['--version'],['--version']]:[['--version']]);
 });
 test('285: missing binary stays distinct from absent account metadata',async t=>{
  const h=geminiFixture(t),entry=cliEntry({...h.description,binary:join(h.dir,'missing')},{env:h.env,cwd:h.dir}),row=(await new ProviderCatalog([entry]).read('gemini')).row;assert.equal(row.installed,false);assert.equal(row.login.state,'unknown');assert.equal(row.version,null);assert.equal(h.capture().length,0);

@@ -3,6 +3,7 @@ import {constants,lstatSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {CliStateStore} from './cli/state.ts';
+import {assertPrivateDirectory,hardenPrivateDirectory} from '@harnessy/team';
 import {ProviderError} from './types.ts';
 import type {CliTurnInput} from './cli/types.ts';
 import {importGeminiSession} from './gemini-session.ts';
@@ -18,10 +19,11 @@ export async function prepareGeminiSettings(configPath:string,input:CliTurnInput
  workspace(input);
  const lease=new CliStateStore('gemini',stateRoot).acquire(input.seat.cwd,input.seat.id),config=join(lease.path,'.gemini');
  let guard:ReturnType<typeof geminiSettingsGuard>|undefined;
- const privateDirectory=()=>{lease.validate();guard?.directories()};
+ const privateDirectory=()=>{lease.validate();guard?.directories();if(process.platform==='win32')assertPrivateDirectory(config)};
  const validate=()=>{privateDirectory();workspace(input)};
  try{
   await mkdir(config,{mode:0o700,recursive:true});
+  if(process.platform==='win32')hardenPrivateDirectory(config);
   guard=geminiSettingsGuard(config);
   await importGeminiSession(join(geminiHome(env),'.gemini'),config,input.seat.cwd,input.seat.sessionId,validate);
   for(const name of ['oauth_creds.json','google_accounts.json']){
