@@ -29,6 +29,10 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Install desktop dependencies
         run: npm --prefix ui/desktop ci --no-audit --no-fund
+      - name: Verify desktop test binary
+        run: |
+          node ui/desktop/node_modules/electron/install.js
+          node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
       - name: Build TypeScript packages
         run: npm run build
       - name: Build and scan site
@@ -37,7 +41,7 @@ jobs:
         run: |
           $tests = @(
             'packages/providers/src/path-recovery.test.ts',
-            'packages/providers/src/login-terminal.test.ts',
+            'packages/providers/src/catalog.test.ts',
             'packages/runtime/src/agent-sandbox.test.ts',
             'packages/api/src/bootstrap.test.ts',
             'packages/api/src/alpha-signup.test.ts',
@@ -106,5 +110,9 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Install desktop dependencies
         run: npm --prefix ui/desktop ci --no-audit --no-fund
+      - name: Verify desktop test binary
+        run: |
+          node ui/desktop/node_modules/electron/install.js
+          node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
       - name: Test complete macOS suite
         run: npm test

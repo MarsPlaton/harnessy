@@ -18,6 +18,8 @@ test('private storage rejects inherited Windows access and protects a directory 
    assert.notEqual(statSync(file).mode&0o777,0o600);
    execFileSync('icacls.exe',[dir,'/grant','*S-1-1-0:R'],{windowsHide:true});
    assert.throws(()=>assertPrivateDirectory(dir),/unsafe Windows permissions/);
+   hardenPrivateDirectory(dir);
+   assert.equal(assertPrivateDirectory(dir).isDirectory(),true);
   }
  }finally{rmSync(dir,{recursive:true,force:true})}
 });

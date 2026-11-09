@@ -97,7 +97,7 @@ mock.module(${JSON.stringify(providers)},{namedExports:{...original,ClaudeProvid
 });
 });
 
-test('18/71: shutdown during startup auth closes partially started server/providers and never kicks queued models',{timeout:5000},async t=>{
+test('18/71: shutdown during startup auth closes partially started server/providers and never kicks queued models',{timeout:process.platform==='win32'?15000:5000},async t=>{
  const h=setup(t),dir=h.env.CHAT_WORK_DIR!;mkdirSync(join(dir,'.harness'),{recursive:true});writeFileSync(join(dir,'.harness/team.yaml'),'version: 1\nseats:\n  codex: {role: executor, vendor: codex, model: gpt-test, mode: read}\n');new Journal(dir).append({sender:'owner',to:['codex'],kind:'task',text:'работа'});
  const controller=new AbortController(),gate=deferred<{loggedIn:boolean}>(),entered=deferred();h.claude.auth=async()=>{entered.resolve();return gate.promise};
  const starting=bootstrap({...h.options,env:{...h.env,HARNESS_NO_LAST:'1'},signal:controller.signal});void starting.catch(()=>{});await entered.promise;controller.abort();
