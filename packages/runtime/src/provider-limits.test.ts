@@ -35,7 +35,7 @@ test('283: timeout ends a pending attempt; close prevents late publication and c
 });
 test('283: corrupt bytes, missing measurement fields and symlinks cannot masquerade as a quota',async t=>{
  const h=setup(t),s=h.create(),file=join(h.dir,'copilot.json');const corrupt=Buffer.from([0xff,123]);writeFileSync(file,corrupt);await s.refresh();assert.deepEqual(readFileSync(file),corrupt);assert.equal(h.reads,0);assert.equal(s.snapshot().errors[0]!.code,'limits_unavailable');unlinkSync(file);
- const outside=join(h.dir,'untouched');writeFileSync(outside,'untouched');let linked=true;try{symlinkSync(outside,file)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){linked=false;t.diagnostic('Windows file symlink requires privilege')}else throw e}if(linked){await s.refresh();assert.equal(readFileSync(outside,'utf8'),'untouched');assert.equal(h.reads,0);unlinkSync(file)}
+ const outside=join(h.dir,'untouched');writeFileSync(outside,'untouched');await t.test('file symlink cache is rejected',async sub=>{try{symlinkSync(outside,file)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){sub.skip('Windows file symlink requires privilege');return}throw e}await s.refresh();assert.equal(readFileSync(outside,'utf8'),'untouched');assert.equal(h.reads,0);unlinkSync(file)});
  h.result(async()=>({ok:true,plan:null,windows:[{label:'month'}],fetchedAt:h.clock.now()/1000}) as any);await s.refresh();assert.deepEqual(s.snapshot().providers[0]!.windows,[]);assert.equal(h.disk().value,null);
 });
 test('283: CLI measurement survives base-provider SSE; closing the project invalidates outstanding reads',async t=>{

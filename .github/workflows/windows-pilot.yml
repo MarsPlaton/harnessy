@@ -35,7 +35,14 @@ jobs:
         run: npm --prefix ui/desktop ci --no-audit --no-fund
       - name: Verify desktop test binary
         run: |
-          node ui/desktop/node_modules/electron/install.js
+          $PSNativeCommandUseErrorActionPreference = $false
+          $installed = $false
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            node ui/desktop/node_modules/electron/install.js
+            if ($LASTEXITCODE -eq 0) { $installed = $true; break }
+            if ($attempt -lt 5) { Start-Sleep -Seconds (10 * $attempt) }
+          }
+          if (-not $installed) { throw 'Electron download failed after five attempts' }
           node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
       - name: Build TypeScript packages
         run: npm run build
@@ -129,7 +136,11 @@ jobs:
         run: npm --prefix ui/desktop ci --no-audit --no-fund
       - name: Verify desktop test binary
         run: |
-          node ui/desktop/node_modules/electron/install.js
+          for attempt in 1 2 3 4 5; do
+            if node ui/desktop/node_modules/electron/install.js; then break; fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            sleep $((10 * attempt))
+          done
           node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
       - name: Test complete macOS suite
         run: npm test

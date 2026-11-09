@@ -8,7 +8,7 @@ import {createRuntime,RuntimeError} from './index.ts';
 import {diskIO,type StateIO} from './state.ts';
 import {harness,OWNER,FakeProvider,completedActions,deferred} from './test-helpers.ts';
 const code=(c:string)=>(e:unknown)=>e instanceof RuntimeError&&e.code===c;
-function fileSymlinkSupported(t:test.TestContext,root:string){const target=join(root,'symlink-probe-target'),link=join(root,'symlink-probe-link');writeFileSync(target,'probe');try{symlinkSync(target,link);unlinkSync(link);return true}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return false}throw e}}
+function fileSymlinkSupported(t:test.TestContext,root:string){const target=join(root,'symlink-probe-target'),link=join(root,'symlink-probe-link');writeFileSync(target,'probe');let linked=false;try{symlinkSync(target,link);linked=true;return true}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return false}throw e}finally{if(linked)unlinkSync(link);unlinkSync(target)}}
 function input(r:Awaited<ReturnType<typeof harness>>['runtime'],extra:Record<string,unknown>={}){const list=r.chatsList(OWNER),chat=list.chats.find(c=>c.id===list.active.room)!;return {id:chat.id,args:{project:r.project.dir,revision:chat.revision,documents:chat.documents,...extra}}}
 
 test('154: promotion keeps chat identity, session and old receipts with provenance; batch once, restart and repeat',async t=>{
