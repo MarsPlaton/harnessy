@@ -43,7 +43,7 @@ npm test                        # строгая сборка всех паке�
 
 ### Пробная сборка для Windows (подписки Claude Code и Codex)
 
-Для сборки на Windows x64 нужны Node.js 22+ и Python 3 с командой `py`. Отдельно установите нативные Claude Code и Codex CLI и войдите через терминал командами `claude auth login` и `codex login`. Кнопки входа внутри окна и API-агенты в этот первый этап не входят.
+Для сборки на Windows x64 нужны Node.js 22+ и Python 3 с командой `python` в `PATH`. Отдельно установите нативные Claude Code и Codex CLI и войдите через терминал командами `claude auth login` и `codex login`. Кнопки входа внутри окна и API-агенты в этот первый этап не входят.
 
 ```powershell
 npm ci
