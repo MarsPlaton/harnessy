@@ -24,7 +24,7 @@ for(const route of ['set','create','room-open','room-create','conversation','res
   mkdirSync(target);const entered=deferred(),release=deferred(),close=h.provider.close.bind(h.provider);let once=true;t.after(()=>release.resolve());
   h.provider.close=async()=>{if(once){once=false;entered.resolve();await release.promise}return close()};
   const endpoint=route==='restore-set'?'/api/project':route==='restore-create'?'/api/project/create':'/api/room/move';
-  const opening=call(h.api,endpoint,{body:{path:target,create:true,git:false,model:'w1'}});await entered.promise;renameSync(target,target+'-old');symlinkSync(root,target);release.resolve();response=await opening;
+  const opening=call(h.api,endpoint,{body:{path:target,create:true,git:false,model:'w1'}});await entered.promise;renameSync(target,target+'-old');symlinkSync(root,target,process.platform==='win32'?'junction':'dir');release.resolve();response=await opening;
   assert.equal(response.status,400);assert.equal(response.body.code,'path_is_root');assert.equal((await call(h.api,'/api/status')).body.project,h.dir);assert.equal((await call(h.api,'/api/project',{body:{path:h.dir}})).status,200);
  }
  if(!route.startsWith('restore-'))assert.equal(response.status,200,JSON.stringify(response.body));

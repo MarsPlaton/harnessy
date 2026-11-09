@@ -1,7 +1,7 @@
 import {buildTestSite} from '../../api/src/site-test-helpers.ts';
 import {createHash} from 'node:crypto';
 import {existsSync,lstatSync,mkdtempSync,readFileSync,readdirSync,readlinkSync,rmSync} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {join,resolve,sep} from 'node:path';
 import {homedir,tmpdir} from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
@@ -15,7 +15,7 @@ export function ownerFilesSnapshot(home=homedir()):Map<string,string>{
  const result=new Map<string,string>();
  function visit(name:string){const path=join(home,name),stat=lstatSync(path,{bigint:true}),type=stat.isFile()?'file':stat.isDirectory()?'directory':stat.isSymbolicLink()?'symlink':'other';
   const content=stat.isFile()?createHash('sha256').update(readFileSync(path)).digest('hex'):stat.isSymbolicLink()?readlinkSync(path):'';
-  result.set(name,JSON.stringify([type,String(stat.mode),String(stat.mtimeNs),String(stat.ctimeNs),content]));
+  result.set(name.split(sep).join('/'),JSON.stringify([type,String(stat.mode),String(stat.mtimeNs),String(stat.ctimeNs),content]));
   if(stat.isDirectory())for(const child of readdirSync(path).sort())visit(join(name,child));
  }
  for(const name of readdirSync(home).filter(name=>name.startsWith('.harness-')).sort())visit(name);

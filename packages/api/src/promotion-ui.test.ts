@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createContext,runInContext} from 'node:vm';
 import {setImmediate as immediate} from 'node:timers/promises';
+import {join} from 'node:path';
 import {fixture,noRepositoryFixture,call,OWNER,deferred,sse,until} from './test-helpers.ts';
 import {dom} from './ui-dom-test-helpers.ts';
 const live=readFileSync(new URL('../../../ui/deploy/live.js',import.meta.url),'utf8'),cx=readFileSync(new URL('../../../ui/deploy/cx.js',import.meta.url),'utf8');
@@ -67,7 +68,7 @@ test('154 UI: promotion on the new-chat page survives applyStatus selecting room
 
 for(const nextChoice of ['other','back','pagehide'])test('154 ОКНА: executed POST reply cannot undo '+nextChoice+' through the real api/boot boundary',async t=>{
  const h=await fixture(t),v=await ui(h),storage=new Map<string,string>(),entered=deferred(),release=deferred();
- await h.runtime.settingsPatch('owner',{projectsRoot:h.dir+'/projects'},OWNER);v.H.noProject=true;
+ await h.runtime.settingsPatch('owner',{projectsRoot:join(h.dir,'projects')},OWNER);v.H.noProject=true;
  Object.assign(v.context,{rememberLive(){},sessionStorage:{getItem:(k:string)=>storage.get(k)??null,setItem:(k:string,value:string)=>storage.set(k,value)}});
  const proto=readFileSync(new URL('../../../ui/deploy/proto.js',import.meta.url),'utf8');runInContext(fixtureWrapper(proto,0,'proto.js'),v.context);
  const boot=v.context.HARNESS_BOOT;boot.select(h.dir);boot.confirm(h.dir,boot.capture());let sections=0;
@@ -77,7 +78,7 @@ for(const nextChoice of ['other','back','pagehide'])test('154 ОКНА: executed
  const promoting=v.context.LIVE.promoteConversation(v.find('.live-acts'),v.context.LIVE.sendBinding());await entered.promise;
  if(nextChoice==='pagehide')await v.window.emit('pagehide');
  else {
-  const next=h.dir+'/other-project';mkdirSync(next);v.context.LIVE.invalidateBinding();assert.equal((await v.context.api('/api/project',{path:next})).ok,true);await v.context.refreshStatus(true);
+  const next=join(h.dir,'other-project');mkdirSync(next);v.context.LIVE.invalidateBinding();assert.equal((await v.context.api('/api/project',{path:next})).ok,true);await v.context.refreshStatus(true);
   if(nextChoice==='back'){v.context.LIVE.invalidateBinding();assert.equal((await v.context.api('/api/project',{path:h.dir})).ok,true);await v.context.refreshStatus(true)}
  }
  const selected=storage.get('harnessy-live-project-v1'),statusToken=boot.capture(),sectionCount=sections,project=v.H.project;
@@ -95,7 +96,7 @@ for(const returns of [false,true])test('154 round 3 ОКНА: another client con
  runInContext('globalThis.api=(()=>{'+fixtureSource(live,fixtureGroups.live_api_to_networkWaiting,{filename:'live.js',wrapper:0})+'return api;})();',v.context);
  const promoting=v.context.LIVE.promoteConversation(v.find('.live-acts'),v.context.LIVE.sendBinding());await entered.promise;
  // This HTTP client never calls this window's api(), boot.select() or invalidateBinding().
- const next=h.dir+'/other-project';mkdirSync(next);assert.equal((await call(h.api,'/api/project',{body:{path:next}})).status,200);await v.context.refreshStatus(true);
+ const next=join(h.dir,'other-project');mkdirSync(next);assert.equal((await call(h.api,'/api/project',{body:{path:next}})).status,200);await v.context.refreshStatus(true);
  assert.equal(v.H.project,next);assert.equal(storage.get('harnessy-live-project-v1'),next);
  if(returns){assert.equal((await call(h.api,'/api/project',{body:{path:h.dir}})).status,200);await v.context.refreshStatus(true)}
  const project=v.H.project,selected=storage.get('harnessy-live-project-v1'),beforeSections=sections;
@@ -104,14 +105,14 @@ for(const returns of [false,true])test('154 round 3 ОКНА: another client con
 });
 
 for(const scenario of ['late','early','foreign','round-trip','wrong-operation','missing-operation'])test('154 round 4: promotion binding classifies '+scenario+' status before its POST receipt',async t=>{
- const h=await fixture(t),v=await ui(h),storage=new Map<string,string>(),entered=deferred(),release=deferred();await h.runtime.settingsPatch('owner',{projectsRoot:h.dir+'/projects'},OWNER);v.H.noProject=true;
+ const h=await fixture(t),v=await ui(h),storage=new Map<string,string>(),entered=deferred(),release=deferred();await h.runtime.settingsPatch('owner',{projectsRoot:join(h.dir,'projects')},OWNER);v.H.noProject=true;
  Object.assign(v.context,{rememberLive(){},sessionStorage:{getItem:(k:string)=>storage.get(k)??null,setItem:(k:string,value:string)=>storage.set(k,value)}});
  const proto=readFileSync(new URL('../../../ui/deploy/proto.js',import.meta.url),'utf8');runInContext(fixtureWrapper(proto,0,'proto.js'),v.context);const boot=v.context.HARNESS_BOOT;boot.select(h.dir);boot.confirm(h.dir,boot.capture());
  v.context.fetch=async(path:string,opts?:{body:string})=>{const response=await call(h.api,path,opts?{body:JSON.parse(opts.body)}:{});if(path.endsWith('/orchestrator')){await h.runtime.idle();entered.resolve();await release.promise}return {json:async()=>response.body}};
  runInContext('globalThis.api=(()=>{'+fixtureSource(live,fixtureGroups.live_api_to_networkWaiting,{filename:'live.js',wrapper:0})+'return api;})();',v.context);
  const promoting=v.context.LIVE.promoteConversation(v.find('.live-acts'),v.context.LIVE.sendBinding());await entered.promise;const created=h.runtime.project.dir;assert.notEqual(created,h.dir);
  if(scenario!=='late')await v.context.refreshStatus(true);
- if(['foreign','round-trip'].includes(scenario)){const other=h.dir+'/unrelated';mkdirSync(other);assert.equal((await call(h.api,'/api/project',{body:{path:other}})).status,200);await v.context.refreshStatus(true);if(scenario==='round-trip'){assert.equal((await call(h.api,'/api/project',{body:{path:created}})).status,200);await v.context.refreshStatus(true)}}
+ if(['foreign','round-trip'].includes(scenario)){const other=join(h.dir,'unrelated');mkdirSync(other);assert.equal((await call(h.api,'/api/project',{body:{path:other}})).status,200);await v.context.refreshStatus(true);if(scenario==='round-trip'){assert.equal((await call(h.api,'/api/project',{body:{path:created}})).status,200);await v.context.refreshStatus(true)}}
  if(scenario==='wrong-operation')v.H.liveStatus.promotions[0].sourceRevision++;
  if(scenario==='missing-operation')delete v.H.liveStatus.promotions;
  const selected=storage.get('harnessy-live-project-v1');release.resolve();const result=await promoting;
@@ -163,14 +164,14 @@ test('221: a saved partial promotion reappears with its reason and retries the s
 });
 
 for(const create of [false,true])test('222: delayed '+(create?'create-and-move':'move')+' uses the same component, prevents duplicates and completes once',async t=>{
- const h=await fixture(t),entered=deferred(),gate=deferred(),v=await ui(h,async(path)=>{if(path==='/api/room/move'){entered.resolve();await gate.promise}}),path=h.dir+'/destination';if(!create)mkdirSync(path);
+ const h=await fixture(t),entered=deferred(),gate=deferred(),v=await ui(h,async(path)=>{if(path==='/api/room/move'){entered.resolve();await gate.promise}}),path=join(h.dir,'destination');if(!create)mkdirSync(path);
  const input={path,create,git:false},moving=v.context.moveConversation(v.find('.live-acts'),input);await entered.promise;assert.match(v.find('[data-live-operations]').textContent,/Harnessy переносит разговор/);assert.equal(v.find('[data-la="move"]').disabled,true);
  assert.equal(await v.context.moveConversation(v.find('.live-acts'),input),false);assert.equal(v.requests.filter(r=>r.path==='/api/room/move').length,1);gate.resolve();assert.equal(await moving,true);assert.equal(v.H.project,path);assert.equal(v.document.querySelector('[data-live-operations]'),null);assert.equal(v.find('[data-la="move"]').disabled,false);
 });
 
 
 for(const create of [false,true])test('222: the '+(create?'mkdir':'move')+' menu reaches HTTP, retains failures for retry and ignores a late reply',async t=>{
- const h=await fixture(t),v=await ui(h),path=h.dir+'/target';if(!create)mkdirSync(path);const original=v.context.api;let writes=0;v.context.api=async(p:string,body:any)=>p==='/api/projects'?{projects:[{name:'target',path,seats:0}]}:p==='/api/room/move'&&++writes===1?{ok:false,error:'fixture move failed'}:original(p,body);
+ const h=await fixture(t),v=await ui(h),path=join(h.dir,'target');if(!create)mkdirSync(path);const original=v.context.api;let writes=0;v.context.api=async(p:string,body:any)=>p==='/api/projects'?{projects:[{name:'target',path,seats:0}]}:p==='/api/room/move'&&++writes===1?{ok:false,error:'fixture move failed'}:original(p,body);
  await v.find('[data-la="'+(create?'mkdir':'move')+'"]').emit('click');if(create){v.find('.live-menu input').value=path;await v.find('.live-menu [data-ok]').emit('click')}else await v.find('.live-menu [data-k="0"]').emit('click');await v.settle();assert.match(v.find('[data-live-operations]').textContent,/fixture move failed/);assert.equal(v.find('[data-la="move"]').disabled,false);
  const gate=deferred<any>();v.context.api=async()=>{writes++;return gate.promise};await v.find('[data-operation-retry]').emit('click');v.H.project='/foreign';v.context.LIVE.operationsDraw();gate.resolve({ok:true,project:path,carried:true});await immediate();await immediate();assert.equal(v.document.querySelector('[data-live-operations]'),null);assert.equal(v.H.project,'/foreign');assert.equal(writes,2);
 });

@@ -23,7 +23,7 @@ app.whenReady().then(async()=>{
  const key=async name=>{
   await evaluate("window.__contextInput=new Promise(resolve=>addEventListener('keyup',()=>resolve(true),{once:true}));true");
   const code=name==='Space'?' ':name;win.webContents.sendInputEvent({type:'keyDown',keyCode:code});if(name==='Enter'||name==='Space')win.webContents.sendInputEvent({type:'char',keyCode:name==='Enter'?'\r':' '});win.webContents.sendInputEvent({type:'keyUp',keyCode:code});
-  await evaluate('window.__contextInput');
+  await evaluate("Promise.race([window.__contextInput,new Promise((_,reject)=>setTimeout(()=>reject(Error('key event not delivered; focus='+document.activeElement?.outerHTML?.slice(0,250))),5000))])");
  };
  await win.loadURL(base+'/sketches/proto/01-chat.html');
  try{await wait("window.LIVE?.H.on&&!LIVE.H.snapshotOnly&&!document.documentElement.hasAttribute('data-live-pending')")}catch(error){throw Error(error.message+'; boot: '+JSON.stringify(await evaluate("(async()=>({live:!!window.LIVE,on:window.LIVE?.H.on,connected:window.LIVE?.H.connected,failed:window.LIVE?.H.connectionFailed,pane:window.LIVE?.H.pane,selection:window.LIVE?.S.ui.pane,project:window.LIVE?.H.project,snapshot:window.LIVE?.H.snapshotOnly,pending:document.documentElement.hasAttribute('data-live-pending'),status:await fetch('/api/status').then(async r=>({code:r.status,text:(await r.text()).slice(0,600)})).catch(e=>String(e))}))()")))}

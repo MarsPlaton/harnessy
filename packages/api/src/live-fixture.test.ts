@@ -41,6 +41,13 @@ test('TS-52: standalone event statements can be selected without surrounding nei
  assert.throws(()=>fixtureSource(source,[{statement:'document.addEventListener("missing"'}]),/не найдена/);
 });
 
+test('TS-52: a multiline statement is found after Windows CRLF checkout',()=>{
+ const source="(function(){\r\nif(PAGE==='spend'){\r\n    globalThis.ready=true\r\n}})();";
+ const extracted=fixtureSource(source,[{statement:"if(PAGE==='spend'){\n    "}]);
+ const context=createContext({PAGE:'spend'});runInContext(extracted,context);
+ assert.equal(context.ready,true);
+});
+
 test('TS-52: scoped blocks extract only the requested local declarations',()=>{
  const source="(function(){function outer(){const item=0; if(enabled){const item=4; const read=()=>item} if(other){const item=9}}})();";
  const context=createContext({});

@@ -81,6 +81,7 @@ function isConditional(node:Node,selection:{identifier:string;equals:string;decl
  * neighbours. Anonymous setup statements use an explicit, unique prefix.
  */
 export function fixtureSource(source:string,entries:readonly FixtureEntry[],options:FixtureOptions={}):string{
+ source=source.replace(/\r\n?/g,'\n');
  const filename=options.filename||'live.js',all=bodies(source);
  let scopes=options.wrapper===undefined?all:all[options.wrapper]?[all[options.wrapper]!]:[];
  if(options.scope){

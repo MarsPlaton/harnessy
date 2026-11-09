@@ -18,7 +18,7 @@ app.whenReady().then(async()=>{
   done({cancel:/^https?:/.test(request.url)&&!request.url.startsWith(base+'/')});
  });
  const evaluate=code=>win.webContents.executeJavaScript(code,true);
- const wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('Boolean('+expression+')'))return;await new Promise(resolve=>setTimeout(resolve,50))}throw Error('Timed out: '+expression)};
+ const wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('Boolean('+expression+')'))return;await new Promise(resolve=>setTimeout(resolve,50))}const detail=await evaluate("JSON.stringify({pane:window.LIVE?.H?.pane?.id,actions:document.querySelector('.frame.cur .live-acts')?.outerHTML,role:document.querySelector('.frame.cur [data-cx=role]')?.outerHTML})");throw Error('Timed out: '+expression+'; DOM: '+detail)};
  const bounds=selector=>`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return null;e.scrollIntoView({block:'nearest',inline:'nearest'});const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);return {x,y,width:r.width,height:r.height,hit:!!h&&(h===e||e.contains(h))}})()`;
  const click=async selector=>{
   await wait('!!('+bounds(selector)+')?.hit');const rect=await evaluate(bounds(selector));
