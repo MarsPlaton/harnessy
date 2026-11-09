@@ -1,10 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,writeFileSync,rmSync,statSync} from 'node:fs';
+import {mkdtempSync,writeFileSync,rmSync,statSync,symlinkSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {assertPrivateDirectory,assertPrivateFile,hardenPrivateDirectory,validatePrivateAcl} from './private-path.ts';
+import {assertNoLinkComponents,assertPrivateDirectory,assertPrivateFile,hardenPrivateDirectory,validatePrivateAcl} from './private-path.ts';
 
 test('private storage rejects inherited Windows access and protects a directory before creating files',()=>{
  const dir=mkdtempSync(join(tmpdir(),'harnessy-private-'));
@@ -30,4 +30,11 @@ test('Windows ACL validation refuses a different owner and a foreign allow entry
  assert.doesNotThrow(()=>validatePrivateAcl(base,true));
  assert.throws(()=>validatePrivateAcl({...base,owner:'S-1-5-21-100-200-300-1002'},true),/unsafe Windows permissions/);
  assert.throws(()=>validatePrivateAcl({...base,rules:[...base.rules,{sid:'S-1-1-0',type:'Allow',rights:1,inherited:false}]},true),/unsafe Windows permissions/);
+});
+
+test('Windows 8.3 directory names are accepted while junctions are rejected',()=>{
+ if(process.platform!=='win32')return;
+ if(existsSync('C:\\PROGRA~1'))assert.doesNotThrow(()=>assertNoLinkComponents('C:\\PROGRA~1'));
+ const dir=mkdtempSync(join(tmpdir(),'harnessy-link-check-'));
+ try{const link=join(dir,'junction');symlinkSync(dir,link,'junction');assert.throws(()=>assertNoLinkComponents(link),/unsafe linked path/)}finally{rmSync(dir,{recursive:true,force:true})}
 });

@@ -1,6 +1,6 @@
 import {execFileSync} from 'node:child_process';
-import {lstatSync,realpathSync,type Stats} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {lstatSync,type Stats} from 'node:fs';
+import {dirname,isAbsolute,join,parse,sep} from 'node:path';
 
 const sidPattern=/^S-1-\d+(?:-\d+)+$/;
 const allowedSystemSids=new Set(['S-1-5-18','S-1-5-32-544']);
@@ -25,9 +25,22 @@ export function validatePrivateAcl(value:Descriptor,requireProtected:boolean):vo
  if(value.owner!==value.current||requireProtected&&!value.protected||value.rules.some(r=>r.type==='Allow'&&r.sid!==value.current&&!allowedSystemSids.has(r.sid))||!value.rules.some(r=>r.type==='Allow'&&r.sid===value.current&&(r.rights&fullControl)===fullControl))throw Error('unsafe Windows permissions');
 }
 function privateDescriptor(path:string,requireProtected:boolean):void {validatePrivateAcl(descriptor(path),requireProtected)}
+/** Reject links in every existing path component without mistaking Windows 8.3 aliases for links. */
+export function assertNoLinkComponents(path:string):void {
+ const native=process.platform==='win32'?path.replaceAll('/',sep):path;
+ const full=isAbsolute(native)?native:process.cwd()+sep+native;
+ let current=parse(full).root;
+ for(const part of full.slice(current.length).split(sep)){
+  if(!part||part==='.')continue;
+  if(part==='..'){current=dirname(current);continue}
+  current=current.endsWith(sep)?current+part:current+sep+part;
+  if(lstatSync(current).isSymbolicLink())throw Error('unsafe linked path');
+ }
+}
 function plain(path:string,file:boolean):Stats {
  const stat=lstatSync(path);
- if(stat.isSymbolicLink()||(file?!stat.isFile():!stat.isDirectory())||process.platform==='win32'&&realpathSync(path)!==resolve(path))throw Error('unsafe private path');
+ if(stat.isSymbolicLink()||(file?!stat.isFile():!stat.isDirectory()))throw Error('unsafe private path');
+ if(process.platform==='win32')assertNoLinkComponents(path);
  return stat;
 }
 export function assertPrivateDirectory(path:string):Stats {

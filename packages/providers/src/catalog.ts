@@ -134,5 +134,5 @@ export class ProviderCatalog {
 
  // Notify each completed read immediately; another slow CLI must not delay binding revocation.
  async list(observe?:(value:Awaited<ReturnType<ProviderCatalog['read']>>)=>void){return Promise.all([...this.entries.keys()].map(async id=>{const value=await this.read(id);observe?.(value);return value}))}
- async close(){this.closed=true;this.scheduler.close();this.listeners.clear();for(const reader of this.quotaAuth.values())reader.close();await Promise.all([...this.entries.values()].map(e=>e.close?.()))}
+ async close(){this.closed=true;this.scheduler.close();this.listeners.clear();for(const reader of this.quotaAuth.values())reader.close();await Promise.allSettled([...this.reading.values()]);await Promise.all([...this.entries.values()].map(e=>e.close?.()))}
 }

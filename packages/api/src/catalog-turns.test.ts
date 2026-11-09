@@ -26,7 +26,7 @@ test('303/306: unknown vendor and unsupported mode reject without changing pane 
 
 test('303: /status uses a snapshot without awaiting CLI metadata; missing turn modes never authorize a turn',async t=>{
  const f=await cliFixture(t,'probe'),entry=cliEntry(f.description,{env:f.env,cwd:f.dir}),gate=deferred();entry.version=async()=>{await gate.promise;return '1'};delete entry.capabilities.turn;
- const h=await fixture(t,{deps:{providerCatalog:new ProviderCatalog([entry])}});try{const r=await call(h.api,'/api/status');assert.equal(r.status,200);assert.equal(r.body.turnModes['test-cli'].read.ok,false);assert.deepEqual(r.body.models['test-cli'],[]);assert.throws(()=>h.runtime.validateTurn('test-cli','read'),{code:'capability_unsupported'})}finally{gate.resolve()}
+ const h=await fixture(t,{deps:{providerCatalog:new ProviderCatalog([entry])}});try{const r=await call(h.api,'/api/status');assert.equal(r.status,200);assert.equal(r.body.turnModes['test-cli'].read.ok,false);assert.deepEqual(r.body.models['test-cli'],[]);assert.throws(()=>h.runtime.validateTurn('test-cli','read'),{code:'capability_unsupported'})}finally{gate.resolve();await h.runtime.close()}
 });
 
 test('303: a registered vendor in team.yaml survives loading; unregistered ids are not executable',async t=>{
