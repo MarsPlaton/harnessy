@@ -8,6 +8,7 @@ import {CliStateStore} from './cli/state.ts';
 import {ProviderCatalog,cliEntry} from './catalog.ts';
 import {COPILOT_UNAVAILABLE} from './copilot.ts';
 import {bridge} from './bridge-test-support.ts';
+import {assertPrivateDirectory} from '@harnessy/team';
 
 test('261/281: process metadata uses only RPC reads, masks account, keeps HOME and excludes environment overrides',async t=>{
  const h=await copilotFixture(t),{row}=await new ProviderCatalog([h.entry]).read('copilot');
@@ -33,7 +34,7 @@ test('293: the MCP bridge has no probe/resume escape hatch',async()=>{
 });
 test('281/282: state cleanup is journaled, preserves neighbours, refuses traversal, symlinks and a running seat',async t=>{
  const h=await copilotFixture(t),store=new CliStateStore('copilot',h.stateRoot),a=store.acquire(h.dir,'worker'),b=store.acquire(h.dir,'reviewer');writeFileSync(join(a.path,'session'),'worker');writeFileSync(join(b.path,'session'),'reviewer');
- assert.equal(statSync(a.path).mode&0o777,0o700);assert.throws(()=>store.acquire(h.dir,'worker'),{code:'busy'});await assert.rejects(store.remove(h.dir,undefined,()=>{}),{code:'busy'});a.release();b.release();
+ if(process.platform==='win32')assert.equal(assertPrivateDirectory(a.path).isDirectory(),true);else assert.equal(statSync(a.path).mode&0o777,0o700);assert.throws(()=>store.acquire(h.dir,'worker'),{code:'busy'});await assert.rejects(store.remove(h.dir,undefined,()=>{}),{code:'busy'});a.release();b.release();
  await assert.rejects(store.remove(h.dir,'../outside',()=>{}),{code:'protocol'});await assert.rejects(store.remove(h.dir,'worker',()=>{throw Error('journal failed')}));assert.ok(existsSync(a.path));
  const journal:any[]=[];await store.remove(h.dir,'worker',e=>{journal.push(e)});assert.equal(existsSync(a.path),false);assert.equal(readFileSync(join(b.path,'session'),'utf8'),'reviewer');assert.equal(journal[0].kind,'provider.state.remove');
  symlinkSync(h.dir,a.path);await assert.rejects(store.remove(h.dir,'worker',()=>{}),{code:'protocol'});assert.ok(existsSync(h.account));

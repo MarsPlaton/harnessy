@@ -5,12 +5,13 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ProviderCatalog,ProviderError,type CatalogEntry} from '@harnessy/providers';
 import {CatalogCache} from '../../providers/src/catalog-cache.ts';
+import {hardenPrivateDirectory} from '@harnessy/team';
 import {fixture,call} from './test-helpers.ts';
 const opts={timeout:15000},marker='sk-REVIEW-ONLY-CACHE-SECRET-123456789';
 const entry=():CatalogEntry=>({id:'fixture',title:'Fixture',binary:'/fixture/fixture',login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,mcp:true,resume:true,limits:false},version:async()=> '1',auth:async()=>({loggedIn:true,email:'alice@example.test'}),models:async()=>[{id:'model-1',label:'Model 1'}],runTurn:async()=>{throw Error('no model allowed')}});
 
 test('354: cache never forwards embedded credentials in model id, label, version or account through HTTP',{...opts},async t=>{
- const cacheDir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-public-')));t.after(()=>rmSync(cacheDir,{recursive:true,force:true}));
+ const cacheDir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-public-')));t.after(()=>rmSync(cacheDir,{recursive:true,force:true}));if(process.platform==='win32')hardenPrivateDirectory(cacheDir);
  for(const field of ['account','label','id','version']){
   const raw:any={schema:1,id:'fixture',binary:'/fixture/fixture',installed:true,version:'1',login:{state:'ok',account:'a•••@example.test',checkedAt:Date.now()},models:[{id:'model-1',label:'Model 1'}]};
   if(field==='account')raw.login.account='a•••@'+marker+'.example.test';else if(field==='version')raw.version='prefix_'+marker;else raw.models[0][field]='prefix_'+marker;

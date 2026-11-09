@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync} from 'node:fs';
+import {existsSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {QWEN,QWEN_LOGIN_UNKNOWN,QWEN_MODELS_UNAVAILABLE,qwenVersion} from './qwen.ts';
 import {qwenStream} from './qwen-stream.ts';
@@ -9,6 +9,7 @@ import {ProviderError} from './types.ts';
 import {CliProvider} from './cli/provider.ts';
 import {qwenFixture,QWEN_SESSION,QWEN_TEST_TIMEOUT_MS as timeout} from './qwen-test-helpers.ts';
 import {cliFixture} from './cli/test-support.ts';
+import {assertPrivateDirectory,assertPrivateFile} from '@harnessy/team';
 
 test('333 Qwen metadata: version only, unknown auth, default model, no invented quota', {timeout},async t=>{
  const f=qwenFixture(t),catalog=new ProviderCatalog([f.entry]);t.after(()=>catalog.close());const {row}=await catalog.read('qwen');
@@ -23,10 +24,10 @@ test('333 Qwen metadata: version only, unknown auth, default model, no invented 
 
 test('333 Qwen all: isolated MCP file, OAuth only, actual bridge, tools/usage, exact-session resume and cleanup', {timeout},async t=>{
  const h=await cliFixture(t,'probe'),f=qwenFixture(t,'bridge'),p=new CliProvider(f.description,f.deps);t.after(()=>p.close());
- const ctx={...h.ctx,signal:AbortSignal.any([t.signal,h.ctx.signal])},seat={...h.seat,cwd:f.dir,vendor:'qwen',model:'default',mode:'all' as const};
+ let privateAcl=false;const ctx={...h.ctx,signal:AbortSignal.any([t.signal,h.ctx.signal]),beforeModel:async()=>{if(process.platform==='win32'){const directory=join(f.dir,readdirSync(f.dir).find(name=>name.startsWith('harnessy-cli-'))!);privateAcl=assertPrivateDirectory(directory).isDirectory()&&assertPrivateFile(join(directory,'mcp.json')).isFile()}}},seat={...h.seat,cwd:f.dir,vendor:'qwen',model:'default',mode:'all' as const};
  const first=await p.runTurn(seat,'hello',ctx);assert.equal(first.text,'готов');assert.equal(first.sessionId,QWEN_SESSION);
  assert.equal(h.requests.length,1);assert.deepEqual(h.traces.map(e=>e.phase),['call','result']);assert.deepEqual((h.events.at(-1) as any).usage,{input:9,output:2,cacheRead:3});assert.equal(h.starts,1);assert.deepEqual(h.registered,h.revoked);
- const command=f.capture().find(x=>x.args),config=f.capture().find(x=>x.path);assert.equal(command.args[command.args.indexOf('--auth-type')+1],'qwen-oauth');assert.ok(command.args.includes('--safe-mode'));assert.equal(command.args[command.args.indexOf('--approval-mode')+1],'yolo');assert.ok(!command.args.includes('-m')&&!command.args.includes('--model'));assert.deepEqual(command.keys,[]);assert.equal(command.home,process.env.HOME);assert.equal(config.mode,0o600);assert.deepEqual(config.servers,['harnessy']);assert.ok(config.tokenPresent);assert.equal(existsSync(config.path),false);
+ const command=f.capture().find(x=>x.args),config=f.capture().find(x=>x.path);assert.equal(command.args[command.args.indexOf('--auth-type')+1],'qwen-oauth');assert.ok(command.args.includes('--safe-mode'));assert.equal(command.args[command.args.indexOf('--approval-mode')+1],'yolo');assert.ok(!command.args.includes('-m')&&!command.args.includes('--model'));assert.deepEqual(command.keys,[]);assert.equal(command.home,process.env.HOME);if(process.platform==='win32')assert.equal(privateAcl,true);else assert.equal(config.mode,0o600);assert.deepEqual(config.servers,['harnessy']);assert.ok(config.tokenPresent);assert.equal(existsSync(config.path),false);
  const again=await p.runTurn({...seat,sessionId:first.sessionId},'again',ctx);assert.equal(again.sessionId,QWEN_SESSION);assert.ok(f.capture().some(x=>x.args?.includes('--resume')&&x.args.includes(QWEN_SESSION)));
  const before=f.capture().length;
  for(const mode of ['read','edit'] as const)await assert.rejects(p.runTurn({...seat,mode},'no',ctx),{code:'mode_unsupported'});

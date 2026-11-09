@@ -5,15 +5,15 @@ import {join} from 'node:path';
 import {GitOps,execute,withGitLock} from './gitops.ts';
 import {openProjectGit,writableRoots} from './project.ts';
 import {temp,repo,seedRepo,git,failure,response} from './test-support.ts';
-import {withPathLock,type Seat} from '@harnessy/team';
+import {canonicalPath,withPathLock,type Seat} from '@harnessy/team';
 import {setImmediate as tick} from 'node:timers/promises';
 import {ProjectError} from './errors.ts';
 const seat:Seat={id:'executor',role:'executor',kind:'worker',label:'воркер',vendor:'codex',model:'model',mode:'ask',digest:false,writePaths:[],instructions:null,worktree:'.worktrees/executor'};
 test('TS-45.3: copied Git seeds retain independent indexes, objects and branches',()=>{
  const first=temp(),second=temp();try{
   const base=seedRepo(first.root);assert.equal(seedRepo(second.root),base);
-  assert.equal(git(first.root,'rev-parse','--show-toplevel'),first.root);
-  assert.equal(git(second.root,'rev-parse','--show-toplevel'),second.root);
+  assert.equal(canonicalPath(git(first.root,'rev-parse','--show-toplevel')),first.root);
+  assert.equal(canonicalPath(git(second.root,'rev-parse','--show-toplevel')),second.root);
   const object=join('.git','objects',base.slice(0,2),base.slice(2));
   for(const path of ['base.txt','.git/index',object])assert.notEqual(statSync(join(first.root,path)).ino,statSync(join(second.root,path)).ino,path);
   writeFileSync(join(first.root,'base.txt'),'changed');git(first.root,'add','base.txt');git(first.root,'commit','-qm','different');

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync,existsSync,writeFileSync,readFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {basename,join} from 'node:path';
 import {loadTeam,ensureLine} from '@harnessy/team';
 import {initProject,defaultModel,uniqueProject,projectsRoot} from './project.ts';
 import {projectSlug,projectNameFrom} from './slug.ts';
@@ -12,7 +12,7 @@ test('[10,15,28] init own nested git, one orchestrator, default model order with
  const t=temp();try{repo(t.root);const path=join(t.root,'child'),catalog={claude:[{id:'claude'}],codex:[{id:'codex'}]};assert.equal(defaultModel({roomModel:'room',catalog}),'room');assert.equal(defaultModel({catalog}),'claude');assert.equal(defaultModel({catalog:{codex:catalog.codex}}),'codex');assert.equal(defaultModel({catalog:{}}),'');
  const result=await initProject(path,{}, {catalog});assert.equal(result.created,true);assert.equal(result.git,true);assert.equal(result.orchestrator,true);assert.equal(existsSync(join(path,'.git')),true);assert.equal(loadTeam(join(path,'.harness')).seats.orchestrator!.model,'claude');
  const again=await initProject(path,{},{catalog});assert.equal(again.created,false);assert.equal(again.orchestrator,false);
- const [a,b]=await Promise.all([uniqueProject(join(t.root,'projects'),'same',{git:false,orchestrator:false}),uniqueProject(join(t.root,'projects'),'same',{git:false,orchestrator:false})]);assert.equal(a.path.endsWith('/same'),true);assert.equal(b.path.endsWith('/same-2'),true);
+ const [a,b]=await Promise.all([uniqueProject(join(t.root,'projects'),'same',{git:false,orchestrator:false}),uniqueProject(join(t.root,'projects'),'same',{git:false,orchestrator:false})]);assert.equal(basename(a.path),'same');assert.equal(basename(b.path),'same-2');
  }finally{t.close()}
 });
 test('[16] slug agrees with Python examples, time fallback, bounds and first owner message',()=>{

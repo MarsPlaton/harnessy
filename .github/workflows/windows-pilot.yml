@@ -12,7 +12,7 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 50
     defaults:
       run:
         shell: pwsh
@@ -51,7 +51,7 @@ jobs:
           node --import ./packages/projects/src/test-helpers.ts --test --test-concurrency=4 $tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test complete Windows suite
-        timeout-minutes: 20
+        timeout-minutes: 35
         run: npm test
       - name: Package Windows app
         run: npm --prefix ui/desktop run dist:win

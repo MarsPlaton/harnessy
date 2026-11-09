@@ -3,7 +3,8 @@ import {isAbsolute,parse,sep,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 // Preserve symlink/.. order for existing prefixes, including paths not created yet.
 export function canonicalPath(path:string,links={count:0}):string {
- const full=isAbsolute(path)?path:process.cwd()+sep+path;let current=parse(full).root;
+ const native=process.platform==='win32'?path.replaceAll('/',sep):path;
+ const full=isAbsolute(native)?native:process.cwd()+sep+native;let current=parse(full).root;
  for(const part of full.slice(current.length).split(sep)){
  if(!part||part==='.')continue;if(part==='..'){current=dirname(current);continue}
  const next=current.endsWith(sep)?current+part:current+sep+part;

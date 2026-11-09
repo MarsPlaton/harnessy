@@ -43,7 +43,7 @@ if(main&&process.argv[2]==='run'){
   if(process.platform==='win32'&&!npmCli)throw Error('Windows test runner requires npm execpath');
   const build=spawnSync(npmCli?process.execPath:'npm',[...(npmCli?[npmCli]:[]),'run','build'],{stdio:'inherit'});if(build.error)throw build.error;if(build.status!==0)return build.status??1;
   process.env.HARNESSY_TEST_SITE=buildTestSite();
-  const tests=spawnSync(process.execPath,['--import',pathToFileURL(ownFile).href,'--test','packages/*/src/**/*.test.ts'],{stdio:'inherit'});if(tests.error)throw tests.error;return tests.status??1;
+  const tests=spawnSync(process.execPath,['--import',pathToFileURL(ownFile).href,'--test',...(process.platform==='win32'?['--test-concurrency=4','--test-timeout=120000','--test-force-exit']:[]),'packages/*/src/**/*.test.ts'],{stdio:'inherit'});if(tests.error)throw tests.error;return tests.status??1;
  });
 }else{
  const directory=mkdtempSync(join(tmpdir(),'harnessy-test-owner-'));

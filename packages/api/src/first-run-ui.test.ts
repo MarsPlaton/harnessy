@@ -2,6 +2,7 @@ import {fixtureSource,fixtureGroups} from './live-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {createContext,runInContext} from 'node:vm';
 import {setImmediate as immediate} from 'node:timers/promises';
 import {fixture as apiFixture,call,OWNER,deferred} from './test-helpers.ts';
@@ -167,11 +168,12 @@ test('TS-34: pending send becomes a draft and first run never replays it',async 
 
 test('TS-34: folder control still creates the selected project without a model turn',async t=>{
  const h=await fixture(t,{seats:'  {}'}),v=await ui(h);runInContext(fixtureSource(live,fixtureGroups.live_projectPathValue_to_projectPathValue,{filename:'live.js',wrapper:0})+'globalThis.LIVE={H,S,save,api,esc,toast,log,paneName,hStatus,pickPane,refreshStatus,loadChat,sendBinding,bindingCurrent,invalidateBinding,operationsDraw,projectPathValue};',v.vm);runInContext(readFileSync(new URL('../../../ui/deploy/cx.js',import.meta.url),'utf8'),v.vm);
- await v.find('[data-cx="folder"]').emit('click');await v.settle();await v.find('[data-cx-nav="mkdir"]').emit('click');v.find('input.cx-path').value=h.dir+'/first-project';await v.find('[data-cx-mkdir]').emit('click');await v.settle();v.f.draw();assert.equal(h.runtime.project.dir,h.dir+'/first-project');assert.equal(v.H.project,h.dir+'/first-project');assert.match(v.find('.st[data-s="1"] .pick small').textContent,/first-project/);assert.equal(h.provider.calls.length,0);
+ const target=join(h.dir,'first-project');await v.find('[data-cx="folder"]').emit('click');await v.settle();await v.find('[data-cx-nav="mkdir"]').emit('click');v.find('input.cx-path').value=target;await v.find('[data-cx-mkdir]').emit('click');await v.settle();v.f.draw();assert.equal(h.runtime.project.dir,target);assert.equal(v.H.project,target);assert.match(v.find('.st[data-s="1"] .pick small').textContent,/first-project/);assert.equal(h.provider.calls.length,0);
 });
 
 for(const bad of [null,[],{binding:{project:'/wrong',pane:'room',chat:null},chat:'known'},{binding:{project:'self',pane:'worker',chat:null},chat:'known'},{binding:{project:'self',pane:'room',chat:null},chat:'<script>'}])test('TS-34: malformed persisted room creation cannot create another chat '+JSON.stringify(bad),async t=>{
- const h=await fixture(t),entry=JSON.parse(JSON.stringify(bad).replace('self',h.dir)),v=await ui(h,undefined,{firstRoomCreations:Array.isArray(bad)?bad:{[h.dir]:entry}});await v.f.next();assert.equal(v.requests.filter(r=>r.body).length,0);assert.match(v.find('.first-failure').textContent,/Не удалось прочитать созданный разговор/);assert.equal(h.provider.calls.length,0);
+ const h=await fixture(t),entry=JSON.parse(JSON.stringify(bad));if(entry?.binding?.project==='self')entry.binding.project=h.dir;
+ const v=await ui(h,undefined,{firstRoomCreations:Array.isArray(bad)?bad:{[h.dir]:entry}});await v.f.next();assert.equal(v.requests.filter(r=>r.body).length,0);assert.match(v.find('.first-failure').textContent,/Не удалось прочитать созданный разговор/);assert.equal(h.provider.calls.length,0);
 });
 
 const missingCreation=(project:string,chat='c-missing')=>({firstRoomCreations:{[project]:{binding:{project,pane:'room',chat:null},chat}}});

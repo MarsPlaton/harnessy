@@ -6,9 +6,10 @@ import {join} from 'node:path';
 import {ProviderCatalog,ProviderError,cliEntry,type CatalogEntry} from '@harnessy/providers';
 import {antigravityFixture} from '../../providers/src/antigravity-test-helpers.ts';
 import {fixture,call,deferred} from './test-helpers.ts';
+import {assertPrivateFile} from '@harnessy/team';
 
 // Four concurrent targeted runs: maximum 1023.24 ms at load 8.33; x8 reserve.
-const timeout=1024*8;
+const timeout=process.platform==='win32'?60_000:1024*8;
 const entry=(id='fixture'):CatalogEntry=>({id,title:id,binary:'/fixture/'+id,login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,resume:true,mcp:true,limits:false},version:async()=> '1',auth:async()=>({loggedIn:true}),models:async()=>[{id:'m1',label:'Model 1'}],runTurn:async()=>{throw Error('no model allowed')}});
 const directory=(t:TestContext)=>{const path=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-catalog-')));t.after(()=>rmSync(path,{force:true,recursive:true}));return path};
 function finished(c:ProviderCatalog,count=1){const done=deferred<any[]>(),values:any[]=[];const off=c.subscribe(v=>{values.push(v);if(values.length===count){off();done.resolve(values)}});return done.promise}
@@ -18,7 +19,7 @@ test('343: ten delayed programs restore immediately; only three read concurrentl
  const cacheDir=directory(t),refreshGate=deferred();t.after(()=>refreshGate.resolve());let now=Date.now(),active=0,maximum=0,slow=false,starts=0;
  const entries=Array.from({length:10},(_,i)=>({...entry('program-'+i),version:async(signal?:AbortSignal)=>{starts++;active++;maximum=Math.max(maximum,active);try{if(slow)await refreshGate.promise;await delay(slow&&i===9?2000:30,signal);return '1'}finally{active--}}}));
  const warm=new ProviderCatalog(entries,()=>now,{cacheDir,timeoutMs:600});await warm.list();assert.equal(maximum,3);await warm.close();const old=warm.peek('program-9');
- assert.equal(readdirSync(cacheDir).filter(x=>x.endsWith('.json')).length,10);const bytes=readFileSync(join(cacheDir,'program-9.json'),'utf8');assert.doesNotMatch(bytes,/fixture-secret|command|capabilities|identity/);assert.equal(statSync(join(cacheDir,'program-9.json')).mode&0o777,0o600);
+ assert.equal(readdirSync(cacheDir).filter(x=>x.endsWith('.json')).length,10);const bytes=readFileSync(join(cacheDir,'program-9.json'),'utf8');assert.doesNotMatch(bytes,/fixture-secret|command|capabilities|identity/);if(process.platform==='win32')assert.equal(assertPrivateFile(join(cacheDir,'program-9.json')).isFile(),true);else assert.equal(statSync(join(cacheDir,'program-9.json')).mode&0o777,0o600);
  now+=300000;slow=true;active=0;maximum=0;starts=0;const catalog=new ProviderCatalog(entries,()=>now,{cacheDir,timeoutMs:600}),done=finished(catalog,10);
  const initial=catalog.peek('program-9');assert.equal(initial.checking,true);assert.equal(initial.login.checkedAt,old.login.checkedAt);assert.match(initial.login.reason!,/проверяется/);assert.deepEqual(initial.models,old.models);
  const h=await fixture(t,{deps:{providerCatalog:catalog}});const response=await call(h.api,'/api/providers/catalog');assert.equal(active,3,'HTTP responds while every admitted reader is still held');refreshGate.resolve();assert.equal(response.status,200);assert.equal(response.body.providers.length,10);assert.ok(response.body.providers.every((p:any)=>p.models.length===1));

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
 import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -129,7 +130,7 @@ test('TS-47.T: CLI writes two separate samples as JSON without storing the messa
     ctx.modelStarted?.();ctx.publish({type:'delta',text:'ок'});ctx.publish({type:'done',sessionId:null,model:seat.model,durationMs:1,usage:{input:1,output:1,cacheRead:0}});return {text:'ок',sessionId:null};
   };
   const output=join(h.dir,'measure.json'),secret='fixture-private-message';
-  const {stdout}=await promisify(execFile)(process.execPath,[new URL('../tools/latency-probe.ts',import.meta.url).pathname,'--url',h.api.url,'--pane','worker','--double','--repeat','2','--message',secret,'--output',output]);
+  const {stdout}=await promisify(execFile)(process.execPath,[fileURLToPath(new URL('../tools/latency-probe.ts',import.meta.url)),'--url',h.api.url,'--pane','worker','--double','--repeat','2','--message',secret,'--output',output]);
   const raw=await readFile(output,'utf8'),result=JSON.parse(raw);assert.equal(result.mode,'double');assert.equal(result.samples.length,2);
   assert.notEqual(result.samples[0].traceId,result.samples[1].traceId);assert.doesNotMatch(raw,new RegExp(secret));assert.match(stdout,/firstCharacter/);assert.equal(h.provider.calls.length,2);
 });

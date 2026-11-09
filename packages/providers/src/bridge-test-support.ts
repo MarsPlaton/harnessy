@@ -3,7 +3,7 @@ import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 const script=fileURLToPath(new URL('../bin/pane-mcp.mjs',import.meta.url));
 export async function bridge(messages:unknown[],token:string|null='test-token',config:{PANE_ID?:string;APP_URL?:string;SEATS?:string}={},response?:Record<string,unknown>){
  const dir=await mkdtemp(join(tmpdir(),'providers-bridge-')),calls=join(dir,'calls.ndjson'),loader=join(dir,'fetch.mjs');
@@ -15,7 +15,7 @@ globalThis.fetch=async(url,options={})=>{
  try{
  const env={...process.env,PANE_ID:'worker',APP_URL:'http://fake.invalid',SEATS:'worker:Worker;reviewer:Review',TEST_CALLS:calls,...config};
  if(token!==null)Object.assign(env,{PANE_TOKEN:token});else delete (env as Record<string,string|undefined>).PANE_TOKEN;
- const child=spawn(process.execPath,['--import',loader,script],{env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
+ const child=spawn(process.execPath,['--import',pathToFileURL(loader).href,script],{env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
  child.stdout.on('data',c=>{stdout+=String(c)});child.stderr.on('data',c=>{stderr+=String(c)});
  const exit=new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve)});
  child.stdin.end(messages.map(m=>JSON.stringify(m)).join('\n')+'\n');const code=await exit;

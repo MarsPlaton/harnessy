@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {readFileSync,mkdirSync,writeFileSync,appendFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {fixture,call,OWNER,until,sse,deferred} from './test-helpers.ts';
 import {promotionInput} from '../../runtime/src/test-helpers.ts';
 import {invokeTool} from '../../providers/src/tools.ts';
@@ -22,7 +23,7 @@ test('233–239: click → promotion HTTP → turn → propose_seats → rejecte
  await until(()=>events.frames.some(e=>e.type==='done'));assert.equal(events.frames.find(e=>e.type==='done')?.traceId,a.body.traceId);
  const seq=rows.find(r=>r.refs.journalSeq).refs.journalSeq;assert.ok((await call(h.api,'/api/trace?journalSeq='+seq)).body.records.some((r:any)=>r.kind==='ui.action'));
  const restarted=new TraceStore(h.dir);t.after(()=>restarted.close());assert.ok((await restarted.read({traceId:a.body.traceId})).some(r=>r.reason.code==='approval_policy'));
- const cli=execFileSync(process.execPath,[new URL('../bin/trace.ts',import.meta.url).pathname,a.body.traceId],{cwd:h.dir,encoding:'utf8'});assert.match(cli,/harnessy:\/\/trace\//);assert.match(cli,/tool.result · rejected.*approval_policy/);
+ const cli=execFileSync(process.execPath,[fileURLToPath(new URL('../bin/trace.ts',import.meta.url)),a.body.traceId],{cwd:h.dir,encoding:'utf8'});assert.match(cli,/harnessy:\/\/trace\//);assert.match(cli,/tool.result · rejected.*approval_policy/);
 });
 
 test('238: missing, forged or stale UI binding is rejected before a trace can enter another project or engine incarnation',async t=>{

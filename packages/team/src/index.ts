@@ -6,4 +6,5 @@ export * from './manifest.ts';
 export * from './templates.ts';
 export * from './strings.ts';
 export * from './locks.ts';
+export * from './private-path.ts';
 export * from './yaml-compat.ts';

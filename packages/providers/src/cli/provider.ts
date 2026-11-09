@@ -13,6 +13,7 @@ import {waitWithSignal} from '../cancellation.ts';
 import {executeCli} from './process.ts';
 import {readCliFileMetadata} from './query.ts';
 import {CliStateStore} from './state.ts';
+import {assertPrivateFile,hardenPrivateDirectory} from '@harnessy/team';
 import type {CliAuth,CliCommand,CliContext,CliDecoder,CliDependencies,CliDescriptor,CliEvent,CliMcpServer,CliProbe,CliProcessResult,CliSeat,CliTurnInput} from './types.ts';
 
 const protocol=(text:string)=>new ProviderError('protocol','CLI: '+text);
@@ -138,16 +139,17 @@ export class CliProvider {
    let mcpArgs:string[]=[],configEnv:NodeJS.ProcessEnv={};
    if(this.d.mcp){
     token=randomBytes(32).toString('hex');ctx.registerProcessToken(token);registered=true;
-    directory=await mkdtemp(join(this.deps.temporaryDirectory,'harnessy-cli-'));const path=join(directory,'mcp.json');
+    directory=await mkdtemp(join(this.deps.temporaryDirectory,'harnessy-cli-'));hardenPrivateDirectory(directory);const path=join(directory,'mcp.json');
     const server:CliMcpServer={command:process.execPath,args:[fileURLToPath(new URL('../../bin/pane-mcp.mjs',import.meta.url))],env:nodeChildEnv({PANE_ID:seat.id,APP_URL:ctx.appUrl,PANE_TOKEN:token,SEATS:input.peers.map(p=>p.id+':'+p.label.replace(/[;\r\n]/g,' ')).join(';')})};
     const config=this.d.mcp.serialize(server,input);mcpArgs=this.d.mcp.args(path,server,input);configEnv=this.d.mcp.env?.(path)??{};
     if(!text(config)||!config||!strings(mcpArgs))throw protocol('нет конфигурации MCP');
     await writeFile(path,config,{encoding:'utf8',mode:0o600,flag:'wx'});
+    assertPrivateFile(path);
     if(this.d.mcp.prepare){prepared=await this.d.mcp.prepare(path,input,this.deps.env,this.deps.stateRoot);configEnv={...configEnv,...prepared.env}}
    }
    let sessionFile='',sessionArgs:string[]=[];
    if(this.d.turn.sessionFile){
-    directory||=await mkdtemp(join(this.deps.temporaryDirectory,'harnessy-cli-'));
+    if(!directory){directory=await mkdtemp(join(this.deps.temporaryDirectory,'harnessy-cli-'));hardenPrivateDirectory(directory)}
     sessionFile=join(directory,'turn.json');sessionArgs=this.d.turn.sessionFile.args(sessionFile);
     if(!strings(sessionArgs)||!sessionArgs.length)throw protocol('неверные флаги экспорта сессии');
    }

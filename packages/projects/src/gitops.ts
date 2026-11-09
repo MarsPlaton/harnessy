@@ -21,7 +21,7 @@ class LockedGitOps {
  constructor(runner:GitRunner,lock:PathLock){this.runner=runner;this.lock=lock}
  async run(args:string[],cwd:string,timeout=60):Promise<CommandResult>{assertPathLock(this.lock);const result=await this.runner(args,cwd,timeout);assertPathLock(this.lock);return result}
  async isRepo(path:string){const r=await this.run(['rev-parse','--is-inside-work-tree'],path);return r.code===0&&r.stdout==='true'}
- async repoRoot(path:string){const r=await this.run(['rev-parse','--show-toplevel'],path);return r.code===0?r.stdout:null}
+ async repoRoot(path:string){const r=await this.run(['rev-parse','--show-toplevel'],path);return r.code===0?canonicalPath(r.stdout):null}
  async ownRepo(path:string){const root=await this.repoRoot(path);return root!==null&&canonicalPath(root)===canonicalPath(path)}
  async head(path:string){const r=await this.run(['rev-parse','HEAD'],path);return r.code===0?r.stdout:null}
  async currentBranch(path:string){const r=await this.run(['rev-parse','--abbrev-ref','HEAD'],path);return r.code===0?r.stdout:null}
@@ -35,10 +35,10 @@ class LockedGitOps {
  }catch(e){throw new ProjectError('write_failed','не записано: '+String(e),500,e)}
  }
  async ensureWorktree(root:string,seat:string,relPath:string,baseBranch:string):Promise<{path:string|null;note:string|null}>{assertPathLock(this.lock,root);
- const canonicalRoot=canonicalPath(root),path=canonicalPath(root+sep+relPath),rel=relative(canonicalRoot,path),branch='seat/'+seat;
+ const canonicalRoot=canonicalPath(root),path=canonicalPath(join(root,relPath)),rel=relative(canonicalRoot,path),branch='seat/'+seat;
  if(isAbsolute(relPath)||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel))return {path:null,note:'worktree '+relPath+' вне проекта'};
  const belongs=async()=>{const top=await this.repoRoot(path);if(!top||canonicalPath(top)!==path||await this.common(root)!==await this.common(path)||await this.currentBranch(path)!==branch)return false;
- const listed=await this.run(['worktree','list','--porcelain','-z'],root);return listed.code===0&&listed.stdout.split('\0').some(line=>line==='worktree '+path)};
+ const listed=await this.run(['worktree','list','--porcelain','-z'],root);return listed.code===0&&listed.stdout.split('\0').some(line=>line.startsWith('worktree ')&&canonicalPath(line.slice(9))===path)};
  if(existsSync(path)){if(await belongs())return {path,note:null};return {path:null,note:relPath+' существует, но это не worktree этого репозитория'}}
  if(!await this.branchExists(root,baseBranch))return {path:null,note:'нет ветки '+baseBranch+': сделай первый коммит, потом worktree появятся'};
  await this.run(['worktree','prune'],root);writeDirectory(dirname(path));

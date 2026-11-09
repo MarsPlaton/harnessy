@@ -3,9 +3,10 @@ import {homedir} from 'node:os';
 import {join,resolve,dirname,isAbsolute} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {ProviderError} from '../types.ts';
+import {assertPrivateDirectory,hardenPrivateDirectory} from '@harnessy/team';
 const invalid=()=>new ProviderError('protocol','CLI: небезопасный каталог состояния');
-function directory(path:string){try{mkdirSync(path,{mode:0o700})}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}const s=lstatSync(path);if(!s.isDirectory()||s.isSymbolicLink())throw invalid();chmodSync(path,0o700);return realpathSync(path)}
-function checkedDirectory(path:string,expected?:Stats){const fd=openSync(path,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{const s=fstatSync(fd);if(!s.isDirectory()||realpathSync(path)!==path||expected&&(s.dev!==expected.dev||s.ino!==expected.ino))throw invalid();return s}finally{closeSync(fd)}}
+function directory(path:string){try{mkdirSync(path,{mode:0o700})}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}const s=lstatSync(path);if(!s.isDirectory()||s.isSymbolicLink())throw invalid();if(process.platform==='win32')hardenPrivateDirectory(path);else chmodSync(path,0o700);return realpathSync(path)}
+function checkedDirectory(path:string,expected?:Stats){const fd=openSync(path,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{const s=fstatSync(fd);if(!s.isDirectory()||realpathSync(path)!==path||expected&&(s.dev!==expected.dev||s.ino!==expected.ino))throw invalid();if(process.platform==='win32')assertPrivateDirectory(path);return s}finally{closeSync(fd)}}
 export interface StateRemoval {kind:'provider.state.remove';provider:string;project:string;seat:string|null}
 /** Generated paths only. Independent engine processes cannot write/delete the same CLI session together. */
 export class CliStateStore {
