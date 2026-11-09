@@ -9,7 +9,7 @@ const row={vendor:'claude',model:'same',inputPerM:1,outputPerM:2,cacheReadPerM:0
 
 test('176 r2: queued owner patch reads the captured canonical file when its symlink changes',async t=>{
  const h=temp();t.after(h.close);const a=join(h.root,'a.json'),b=join(h.root,'b.json'),link=join(h.root,'owner.json');
- writeFileSync(a,JSON.stringify({keep:'OWNER_A',defaultMode:'read'}));writeFileSync(b,JSON.stringify({other:'FILE_B',defaultMode:'all'}));symlinkSync(a,link);const beforeB=readFileSync(b);
+ writeFileSync(a,JSON.stringify({keep:'OWNER_A',defaultMode:'read'}));writeFileSync(b,JSON.stringify({other:'FILE_B',defaultMode:'all'}));try{symlinkSync(a,link)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return}throw e}const beforeB=readFileSync(b);
  let release!:()=>void,entered!:()=>void;const held=new Promise<void>(r=>release=r),ready=new Promise<void>(r=>entered=r);t.after(()=>release());
  const lock=withPathLock(a,async()=>{entered();await held});await ready;
  const pending=new Settings(link).patch('owner',{priceList:[row]});unlinkSync(link);symlinkSync(b,link);release();await lock;const reply=await pending;

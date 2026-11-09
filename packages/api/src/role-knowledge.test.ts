@@ -24,7 +24,7 @@ test('251 HTTP: knowledge is tied to saved proposal and chat, with memory, docum
 test('251: foreign proposal project and escaped memory link never become role knowledge',async t=>{
  const h=await setup(t),created=await h.runtime.createOwnerSeat({project:h.dir,proposalId:h.q.proposalId,version:1,seatIndex:0},OWNER);await h.runtime.idle();
  const p=h.runtime.project,store=p.state.readProposals() as any;p.state.saveProposals({...store,project:'/foreign'});assert.equal((await call(h.api,'/api/chats/'+created.chat)).status,409);p.state.saveProposals(store);
- const file=join(h.dir,'.harness/MEMORY.md'),outside=h.dir+'-outside-memory';unlinkSync(file);symlinkSync(outside,file);writeFileSync(outside,'FOREIGN');
+ const file=join(h.dir,'.harness/MEMORY.md'),outside=h.dir+'-outside-memory';unlinkSync(file);try{symlinkSync(outside,file)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return}throw e}writeFileSync(outside,'FOREIGN');
  try{const result=await call(h.api,'/api/chats/'+created.chat);assert.equal(result.status,409);assert.doesNotMatch(result.text,/FOREIGN/)}finally{unlinkSync(outside)}
 });
 

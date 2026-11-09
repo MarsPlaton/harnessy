@@ -31,7 +31,7 @@ test('[10-12,22] real worktree ownership, branch, symlink boundary and repeated 
  const wt=opened.cwdBySeat.executor!;git(wt,'checkout','-q','--detach');assert.match((await g.ensureWorktree(t.root,'executor','.worktrees/executor','main')).note!,/не worktree этого репозитория/);git(wt,'checkout','-q','seat/executor');
  const foreign=join(t.root,'foreign');mkdirSync(foreign);seedRepo(foreign);assert.match((await g.ensureWorktree(t.root,'foreign','foreign','main')).note!,/не worktree этого репозитория/);
  mkdirSync(join(t.root,'plain'));assert.match((await g.ensureWorktree(t.root,'plain','plain','main')).note!,/не worktree/);
- symlinkSync(outside.root,join(t.root,'outside'),'dir');assert.equal((await g.ensureWorktree(t.root,'outside','outside/new','main')).note,'worktree outside/new вне проекта');
+ symlinkSync(outside.root,join(t.root,'outside'),process.platform==='win32'?'junction':'dir');assert.equal((await g.ensureWorktree(t.root,'outside','outside/new','main')).note,'worktree outside/new вне проекта');
  const nested=join(t.root,'plain'),o=await openProjectGit(nested,[seat],'main',g);assert.equal(o.repoRoot,null);assert.ok(o.lineErrors.some(x=>x.includes('чужого git-репозитория')));
  }finally{t.close();outside.close()}
 });
@@ -62,7 +62,7 @@ test('[26] missing tool and real bounded subprocess timeout are typed',async()=>
 test('[25] concurrent merges from two instances and a symlink share the canonical root lock',async()=>{
  const t=temp();try{const base=seedRepo(t.root),sha:string[]=[];
  for(const name of ['one','two']){git(t.root,'checkout','-qb',name,base);writeFileSync(join(t.root,name+'.txt'),name);git(t.root,'add','.');git(t.root,'commit','-qm',name);sha.push(git(t.root,'rev-parse','HEAD'))}
- git(t.root,'checkout','-q','main');const alias=join(t.root,'alias');symlinkSync(t.root,alias,'dir');
+ git(t.root,'checkout','-q','main');const alias=join(t.root,'alias');symlinkSync(t.root,alias,process.platform==='win32'?'junction':'dir');
  const [one,two]=await Promise.all([new GitOps().mergeInto(t.root,sha[0]!,'main','one'),new GitOps().mergeInto(alias,sha[1]!,'main','two')]);
  assert.ok(one.ok&&two.ok);if(!one.ok||!two.ok)return;
  assert.deepEqual(git(t.root,'rev-list','--parents','-n','1',one.mergeSha!).split(' '),[one.mergeSha,base,sha[0]]);

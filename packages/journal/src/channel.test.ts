@@ -147,8 +147,8 @@ test('[38] deleted/broken policy denies old permissions, restores with one polic
  f.agent('worker',{to:'orchestrator',kind:'note',text:'same snapshot'});assert.equal(f.journal.read({kinds:['policy']}).length,1)
  }finally{f.close()}
 });
-test('[39] symlink to external report is evidence_outside for verdict',()=>{
- const f=fixture(),outside=temp();try{writeFileSync(join(outside.root,'report.md'),'# Ran\n# Skipped\n# Planned\n# Manual');symlinkSync(join(outside.root,'report.md'),join(f.root,'linked'));const rr=f.request();
+test('[39] symlink to external report is evidence_outside for verdict',t=>{
+ const f=fixture(),outside=temp();try{writeFileSync(join(outside.root,'report.md'),'# Ran\n# Skipped\n# Planned\n# Manual');try{symlinkSync(join(outside.root,'report.md'),join(f.root,'linked'))}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return}throw e}const rr=f.request();
  assert.throws(()=>f.agent('reviewer',{to:'worker',kind:'verdict',text:'9',reply_to:rr.seq,score:9,round:1,evidence:['linked']}),error('evidence_outside','путь свидетельства вне проекта: linked'))
  }finally{f.close();outside.close()}
 });

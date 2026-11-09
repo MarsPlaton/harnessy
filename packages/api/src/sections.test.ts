@@ -14,8 +14,8 @@ test('136/140: actual HTTP sections bind to the project, with no roles, no reads
 });
 
 test('136: outside and unreadable HTTP failures have shape J instead of false empty data',async t=>{
- const h=await fixture(t),p=join(h.dir,'.harness','docs');symlinkSync(h.dir+'-missing',p);let r=await call(h.api,'/api/project/sections/docs');assert.equal(r.status,409);assert.equal(r.body.code,'section_unreadable');assert.equal(r.body.empty,undefined);
- symlinkSync(join(h.dir,'..'),join(h.dir,'.harness','research'));r=await call(h.api,'/api/project/sections/research');assert.equal(r.status,403);assert.equal(r.body.code,'section_outside');assert.equal(r.body.ok,false);
+ const h=await fixture(t),p=join(h.dir,'.harness','docs');symlinkSync(h.dir+'-missing',p,process.platform==='win32'?'junction':'dir');let r=await call(h.api,'/api/project/sections/docs');assert.equal(r.status,409);assert.equal(r.body.code,'section_unreadable');assert.equal(r.body.empty,undefined);
+ symlinkSync(join(h.dir,'..'),join(h.dir,'.harness','research'),process.platform==='win32'?'junction':'dir');r=await call(h.api,'/api/project/sections/research');assert.equal(r.status,403);assert.equal(r.body.code,'section_outside');assert.equal(r.body.ok,false);
 });
 
 test('138: one confirmed request journals once to the registered orchestrator, not a supplied pane',async t=>{
@@ -35,7 +35,7 @@ test('138: no orchestrator never posts to a made-up seat',async t=>{
 });
 
 test('136/140: a closed captured project during asynchronous reading yields project_changed, including a reader failure',async t=>{
- for(const broken of [false,true]){const h=await fixture(t);if(broken)symlinkSync(h.dir+'-missing',join(h.dir,'.harness','docs'));const route=sectionRoutes(h.runtime)[0]!,p=h.runtime.project;
+ for(const broken of [false,true]){const h=await fixture(t);if(broken)symlinkSync(h.dir+'-missing',join(h.dir,'.harness','docs'),process.platform==='win32'?'junction':'dir');const route=sectionRoutes(h.runtime)[0]!,p=h.runtime.project;
  const response=route.handle({params:{section:'docs'},body:{},query:new URLSearchParams(),request:null as any});p.closed=true;
  try{await assert.rejects(Promise.resolve(response),(e:any)=>e.code==='project_changed'&&e.status===409)}finally{p.closed=false}}
 });

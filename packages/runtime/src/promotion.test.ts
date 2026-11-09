@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdirSync,writeFileSync,readFileSync,existsSync,readdirSync,symlinkSync,rmSync} from 'node:fs';
+import {mkdirSync,writeFileSync,readFileSync,existsSync,readdirSync,symlinkSync,unlinkSync,rmSync} from 'node:fs';
 import {join,sep} from 'node:path';
 import {withPathLock} from '@harnessy/team';
 import {GitOps} from '@harnessy/projects';
@@ -8,6 +8,7 @@ import {createRuntime,RuntimeError} from './index.ts';
 import {diskIO,type StateIO} from './state.ts';
 import {harness,OWNER,FakeProvider,completedActions,deferred} from './test-helpers.ts';
 const code=(c:string)=>(e:unknown)=>e instanceof RuntimeError&&e.code===c;
+function fileSymlinkSupported(t:test.TestContext,root:string){const target=join(root,'symlink-probe-target'),link=join(root,'symlink-probe-link');writeFileSync(target,'probe');try{symlinkSync(target,link);unlinkSync(link);return true}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink requires privilege');return false}throw e}}
 function input(r:Awaited<ReturnType<typeof harness>>['runtime'],extra:Record<string,unknown>={}){const list=r.chatsList(OWNER),chat=list.chats.find(c=>c.id===list.active.room)!;return {id:chat.id,args:{project:r.project.dir,revision:chat.revision,documents:chat.documents,...extra}}}
 
 test('154: promotion keeps chat identity, session and old receipts with provenance; batch once, restart and repeat',async t=>{
@@ -40,7 +41,7 @@ test('154: null model and absent/stale binding refuse; selecting a model invalid
 });
 
 test('155: required references, ordinary files, realpath containment and 50 limit',async t=>{
- const h=await harness(t),r=h.runtime;r.roomSet({model:'w1'},OWNER);mkdirSync(join(h.dir,'source'));writeFileSync(join(h.dir,'secret.txt'),'outside source');symlinkSync(join(h.dir,'secret.txt'),join(h.dir,'source','escape'));
+ const h=await harness(t),r=h.runtime;if(!fileSymlinkSupported(t,h.dir))return;r.roomSet({model:'w1'},OWNER);mkdirSync(join(h.dir,'source'));writeFileSync(join(h.dir,'secret.txt'),'outside source');symlinkSync(join(h.dir,'secret.txt'),join(h.dir,'source','escape'));
  for(const docs of [undefined,[{project:join(h.dir,'source'),path:'escape'}],[{project:h.dir,path:'source'}],Array(51).fill({project:h.dir,path:'secret.txt'})]){const i=input(r,{documents:docs});await assert.rejects(r.promoteChat(i.id,i.args,OWNER),code('documents_invalid'))}assert.equal(h.provider.calls.length,0);
 });
 
@@ -76,7 +77,7 @@ test('154/155: input object is frozen before awaiting project lock',async t=>{
 
 
 test('155 ОКНА: symlink substitution after validation never grants another document',async t=>{
- const h=await harness(t),r=h.runtime;r.roomSet({model:'w1'},OWNER);const file=join(h.dir,'doc.txt');writeFileSync(file,'original');writeFileSync(join(h.dir,'other.txt'),'replacement');const i=input(r,{documents:[{project:h.dir,path:'doc.txt'}]}),gate=deferred(),entered=deferred();const lock=withPathLock(h.dir,async()=>{entered.resolve();await gate.promise});await entered.promise;
+ const h=await harness(t),r=h.runtime;if(!fileSymlinkSupported(t,h.dir))return;r.roomSet({model:'w1'},OWNER);const file=join(h.dir,'doc.txt');writeFileSync(file,'original');writeFileSync(join(h.dir,'other.txt'),'replacement');const i=input(r,{documents:[{project:h.dir,path:'doc.txt'}]}),gate=deferred(),entered=deferred();const lock=withPathLock(h.dir,async()=>{entered.resolve();await gate.promise});await entered.promise;
  const pending=r.promoteChat(i.id,i.args,OWNER);const {unlinkSync}=await import('node:fs');unlinkSync(file);symlinkSync(join(h.dir,'other.txt'),file);gate.resolve();await lock;await assert.rejects(pending,code('documents_invalid'));assert.equal(r.registry.get('orchestrator'),null);assert.equal(h.provider.calls.length,0);
 });
 
