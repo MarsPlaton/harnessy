@@ -1,5 +1,6 @@
 packages/journal/src/fixtures/** text eol=lf
 packages/projects/src/fixtures/** text eol=lf
 packages/runtime/src/fixtures/** text eol=lf
+packages/runtime/fixtures/** text eol=lf
 packages/team/src/fixtures/** text eol=lf
 packages/team/templates/** text eol=lf

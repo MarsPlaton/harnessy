@@ -63,6 +63,7 @@ jobs:
             'packages/api/src/alpha-signup.test.ts',
             'packages/api/src/attachments.test.ts',
             'packages/api/src/desktop-launcher.test.ts',
+            'packages/api/src/sidebar-design.test.ts',
             'packages/api/src/build-forbidden.test.ts',
             'packages/api/src/team-live-ui.test.ts',
             'packages/api/src/tasks.test.ts',
