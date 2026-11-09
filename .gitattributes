@@ -1,1 +1,3 @@
 packages/journal/src/fixtures/** text eol=lf
+packages/team/src/fixtures/** text eol=lf
+packages/team/templates/** text eol=lf

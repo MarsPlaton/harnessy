@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,realpathSync,statSync,mkdtempSync,mkdirSync,writeFileSync,symlinkSync,rmSync} from 'node:fs';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Runtime} from '../../runtime/src/runtime.ts';
 import {completedActions} from '../../runtime/src/test-helpers.ts';
@@ -21,7 +21,7 @@ async function waitProbe(h:{stream:Awaited<ReturnType<typeof sse>>},predicate:(e
 const result=(h:{stream:Awaited<ReturnType<typeof sse>>},status:string)=>waitProbe(h,e=>e.status===status);
 
 test('TS-33: selected executable is validated, saved for owner and replaces the catalog entry',async t=>{
- const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-program-'))),path=join(dir,'fixture'),wrong=join(dir,'another');t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const dir=realpathSync.native(mkdtempSync(join(tmpdir(),'harnessy-program-'))),path=join(dir,'fixture'),wrong=join(dir,'another');t.after(()=>rmSync(dir,{recursive:true,force:true}));
  writeFileSync(path,'#!/bin/sh\nexit 0\n',{mode:0o755});writeFileSync(wrong,'#!/bin/sh\nexit 0\n',{mode:0o755});
  const make=(binary:string):CatalogEntry=>({id:'fixture',title:'Fixture',binary,login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,resume:false,mcp:false,limits:false},withBinary:make,version:async()=>binary===path?'fixture 1.0':Promise.reject(new ProviderError('no_binary','missing')),auth:async()=>({loggedIn:false}),models:async()=>[],runTurn:async()=>({text:'',sessionId:null})});
  const catalog=new ProviderCatalog([make('fixture')]),h=await fixture(t,{deps:{providerCatalog:catalog}});
@@ -33,14 +33,14 @@ test('TS-33: selected executable is validated, saved for owner and replaces the 
 });
 
 test('TS-33: project links, foreign project binaries and disguised target names are rejected before execution',async t=>{
- const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-program-target-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const dir=realpathSync.native(mkdtempSync(join(tmpdir(),'harnessy-program-target-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
  let versionCalls=0;const make=(binary:string):CatalogEntry=>({id:'fixture',title:'Fixture',binary,login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,resume:false,mcp:false,limits:false},withBinary:make,
   version:async()=>{versionCalls++;return 'fixture 1.0'},auth:async()=>({loggedIn:false}),models:async()=>[],runTurn:async()=>({text:'',sessionId:null})});
  const h=await fixture(t,{deps:{providerCatalog:new ProviderCatalog([make('fixture')])}}),baseline=versionCalls,safe=join(dir,'safe'),foreign=join(dir,'foreign'),links=join(dir,'links');
  for(const folder of [safe,foreign,links,join(foreign,'.git')])mkdirSync(folder);
  const valid=join(safe,'fixture'),other=join(safe,'other-tool'),foreignFile=join(foreign,'fixture');
  for(const file of [valid,other,foreignFile])writeFileSync(file,'#!/bin/sh\nexit 0\n',{mode:0o700});
- const inProject=join(h.dir,'fixture');symlinkSync(valid,inProject);
+ const inProject=join(h.dir,'fixture');try{symlinkSync(valid,inProject)}catch(error){if(process.platform==='win32'&&(error as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows account cannot create file symlinks');return}throw error}
  const outside=await call(h.api,'/api/providers/fixture/binary',{body:{path:inProject}});assert.equal(outside.status,400);
  const foreignDirect=await call(h.api,'/api/providers/fixture/binary',{body:{path:foreignFile}});assert.equal(foreignDirect.status,400);
  const foreignLink=join(links,'fixture');symlinkSync(foreignFile,foreignLink);
@@ -54,13 +54,13 @@ test('TS-33: project links, foreign project binaries and disguised target names 
 });
 
 test('TS-33: canonical targets of installed Codex and Claude launchers remain selectable',async t=>{
- const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-program-launchers-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const dir=realpathSync.native(mkdtempSync(join(tmpdir(),'harnessy-program-launchers-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
  const previous={codex:process.env.CODEX_BIN,claude:process.env.CLAUDE_BIN};t.after(()=>{for(const [id,value] of Object.entries(previous)){const key=id==='codex'?'CODEX_BIN':'CLAUDE_BIN';if(value===undefined)delete process.env[key];else process.env[key]=value}});
  const entries:CatalogEntry[]=[],choices:[string,string,string][]=[
   ['codex',join(dir,'.local','bin','codex'),join(dir,'.local','lib','node_modules','@openai','codex','bin','codex.js')],
   ['claude',join(dir,'.local','bin','claude'),join(dir,'.local','share','claude','versions','2.1.270')],
  ];
- for(const [id,link,target] of choices){mkdirSync(target.slice(0,target.lastIndexOf('/')),{recursive:true});mkdirSync(link.slice(0,link.lastIndexOf('/')),{recursive:true});writeFileSync(target,'#!/bin/sh\nexit 0\n',{mode:0o700});symlinkSync(target,link);
+ for(const [id,link,target] of choices){mkdirSync(dirname(target),{recursive:true});mkdirSync(dirname(link),{recursive:true});writeFileSync(target,'#!/bin/sh\nexit 0\n',{mode:0o700});try{symlinkSync(target,link)}catch(error){if(process.platform==='win32'&&(error as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows account cannot create file symlinks');return}throw error}
   const make=(binary:string):CatalogEntry=>({id,title:id,binary,login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,resume:false,mcp:false,limits:false},withBinary:make,
    version:async()=>id==='codex'?'codex-cli 1.0':'Claude Code 2.1.270',auth:async()=>({loggedIn:false}),models:async()=>[],runTurn:async()=>({text:'',sessionId:null})});entries.push(make(id));
  }
@@ -81,8 +81,8 @@ test('TS-33: canonical targets of installed Codex and Claude launchers remain se
 });
 
 test('TS-33: concurrent path changes leave the last selection in settings and catalog',async t=>{
- const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-program-race-'))),a=join(dir,'a','fixture'),b=join(dir,'b','fixture');t.after(()=>rmSync(dir,{recursive:true,force:true}));
- for(const path of [a,b]){const parent=path.slice(0,path.lastIndexOf('/'));mkdirSync(parent);writeFileSync(path,'#!/bin/sh\nexit 0\n',{mode:0o755})}
+ const dir=realpathSync.native(mkdtempSync(join(tmpdir(),'harnessy-program-race-'))),a=join(dir,'a','fixture'),b=join(dir,'b','fixture');t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ for(const path of [a,b]){mkdirSync(dirname(path));writeFileSync(path,'#!/bin/sh\nexit 0\n',{mode:0o755})}
  const started=deferred(),release=deferred();let delayed=false;
  const make=(binary:string):CatalogEntry=>({id:'fixture',title:'Fixture',binary,login:{args:['login']},forbiddenEnv:[],capabilities:{headless:true,resume:false,mcp:false,limits:false},withBinary:make,
   version:async()=>{if(binary===a&&!delayed){delayed=true;started.resolve();await release.promise}return 'fixture 1.0'},auth:async()=>({loggedIn:false}),models:async()=>[],runTurn:async()=>({text:'',sessionId:null})});
@@ -102,7 +102,7 @@ test('268: public catalog/check use only metadata, mask account and publish prov
 });
 
 test('269: login-terminal ignores forged command, executes descriptor only and records the action',async t=>{
- const h=await setup(t),r=await call(h.api,'/api/providers/fixture/login-terminal',{body:{command:'touch /OWNER-FILE',args:['--evil']}});assert.equal(r.status,200);assert.equal(r.body.ok,true);assert.match(r.body.command,/fixture path/);assert.equal(h.opened.length,1);const script=h.opened[0]!;assert.equal(script.mode,0o700);assert.doesNotMatch(script.text,/OWNER-FILE|--evil/);assert.match(script.text,/'-u' 'SECRET_KEY'/);assert.match(script.text,/'value with '\\'' quote'/);assert.equal(h.calls.length,0);assert.equal(h.runtime.journal.read({limit:0}).filter(r=>r.origin==='provider.login_terminal').length,1);const traces=await h.runtime.project.trace.read();assert.ok(traces.some(r=>r.kind==='provider.login_terminal.start'));assert.ok(traces.some(r=>r.kind==='provider.login_terminal'&&r.outcome==='ok'));assert.equal(JSON.stringify(traces).includes('alice@example.test'),false);await h.terminal.close();assert.equal(existsSync(script.file),false);
+ const h=await setup(t),r=await call(h.api,'/api/providers/fixture/login-terminal',{body:{command:'touch /OWNER-FILE',args:['--evil']}});assert.equal(r.status,200);assert.equal(r.body.ok,true);assert.match(r.body.command,/fixture path/);assert.equal(h.opened.length,1);const script=h.opened[0]!;if(process.platform!=='win32')assert.equal(script.mode,0o700);assert.doesNotMatch(script.text,/OWNER-FILE|--evil/);assert.match(script.text,/'-u' 'SECRET_KEY'/);assert.match(script.text,/'value with '\\'' quote'/);assert.equal(h.calls.length,0);assert.equal(h.runtime.journal.read({limit:0}).filter(r=>r.origin==='provider.login_terminal').length,1);const traces=await h.runtime.project.trace.read();assert.ok(traces.some(r=>r.kind==='provider.login_terminal.start'));assert.ok(traces.some(r=>r.kind==='provider.login_terminal'&&r.outcome==='ok'));assert.equal(JSON.stringify(traces).includes('alice@example.test'),false);await h.terminal.close();assert.equal(existsSync(script.file),false);
 });
 
 test('269: unknown/absent/other-platform/agent requests cannot open Terminal',async t=>{
@@ -168,7 +168,7 @@ for(const scenario of ['probe','denied','ok'] as const)test('259/271: HTTP appro
  const cli=await cliFixture(t,scenario),catalog=new ProviderCatalog([cliEntry(cli.description,{env:cli.env,cwd:cli.dir,temporaryDirectory:cli.dir})]),h=await fixture(t,{deps:{providerCatalog:catalog}}),stream=await sse(h.api);t.after(()=>stream.close());
  const requested=await call(h.api,'/api/providers/test-cli/probe',{body:{model:'test-model'}});assert.equal(requested.status,200);assert.equal(cli.capture().some(e=>e.action==='turn'),false);
  await call(h.api,'/api/approve',{body:{pane:'owner',id:requested.body.approvalId,decision:'allow',project:h.dir}});const outcome=await waitProbe({stream},e=>e.approvalId===requested.body.approvalId&&['done','error'].includes(e.status));
- const turn=cli.capture().find(e=>e.action==='turn')!;assert.equal(turn.args[turn.args.indexOf('--sandbox')+1],'read-only');const config=cli.capture().find(e=>e.configPath)!;assert.equal(config.mode,0o600);assert.equal(existsSync(config.configPath),false);
+ const turn=cli.capture().find(e=>e.action==='turn')!;assert.equal(turn.args[turn.args.indexOf('--sandbox')+1],'read-only');const config=cli.capture().find(e=>e.configPath)!;if(process.platform!=='win32')assert.equal(config.mode,0o600);assert.equal(existsSync(config.configPath),false);
  if(scenario==='probe'){assert.equal(outcome.status,'done');assert.equal(outcome.turn.text,'fixture answer');assert.deepEqual(outcome.turn.usage,{input:10,output:2,cacheRead:3})}else{assert.equal(outcome.status,'error');assert.equal(outcome.error.code,scenario==='denied'?'permission_denied':'transport_lost')}
  assert.equal(h.runtime.journal.read({limit:0}).some(r=>r.text==='fixture'),false,'the probe bridge cannot write to the project');assert.equal(h.provider.calls.length,0);
 });

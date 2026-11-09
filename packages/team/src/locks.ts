@@ -11,7 +11,7 @@ export function canonicalPath(path:string,links={count:0}):string {
  try{const st=lstatSync(next);if(st.isSymbolicLink()){
  if(++links.count>40)throw Error('слишком много символических ссылок');
  const target=readlinkSync(next);current=canonicalPath(isAbsolute(target)?target:current+sep+target,links)
- }else current=realpathSync(next)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;current=next}
+ }else current=realpathSync.native(next)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;current=next}
  }return current
 }
 declare const lockBrand:unique symbol;

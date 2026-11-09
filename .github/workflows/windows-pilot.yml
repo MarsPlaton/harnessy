@@ -74,6 +74,8 @@ jobs:
           $env:CHAT_WORK_DIR = Join-Path $env:RUNNER_TEMP 'harnessy-ci-project'
           $env:HARNESS_PROJECTS_ROOT = Join-Path $env:RUNNER_TEMP 'harnessy-ci-projects'
           $env:HARNESS_PROJECTS_FILE = Join-Path $env:RUNNER_TEMP 'harnessy-ci-projects.json'
+          $env:HARNESS_LAST_PROJECT_FILE = Join-Path $env:RUNNER_TEMP 'harnessy-ci-last-project'
+          $env:HARNESS_NO_LAST = '1'
           $env:HARNESS_SETTINGS_FILE = Join-Path $env:RUNNER_TEMP 'harnessy-ci-settings.json'
           New-Item -ItemType Directory -Path $env:CHAT_WORK_DIR -Force | Out-Null
           $argument = '"' + $entry + '"'
@@ -85,11 +87,18 @@ jobs:
               try {
                 $status = Invoke-RestMethod 'http://127.0.0.1:39777/api/status' -TimeoutSec 2
                 $page = Invoke-WebRequest 'http://127.0.0.1:39777/sketches/proto/10-new-chat.html' -TimeoutSec 2
-                if ($status.project -eq $env:CHAT_WORK_DIR -and $page.StatusCode -eq 200 -and $status.autopilot.available -eq $false) { $ready = $true; break }
+                if ($status.project -eq $env:CHAT_WORK_DIR -and $page.StatusCode -eq 200 -and $status.autopilot.on -eq $false) { $ready = $true; break }
               } catch { }
               Start-Sleep -Seconds 1
             }
             if (-not $ready) { throw 'Packaged engine did not serve the isolated project and site' }
+            $headers = @{ 'Content-Type' = 'application/json' }
+            $on = @{ project = $status.project; instance = $status.trace.instanceId; revision = $status.autopilot.revision; on = $true; until = 'morning'; conditions = @{ operations = @('answer_question'); maxSpendPercent = 5 } } | ConvertTo-Json -Compress -Depth 4
+            $enabled = Invoke-RestMethod 'http://127.0.0.1:39777/api/autopilot' -Method Post -Headers $headers -Body $on
+            if ($enabled.autopilot.on -ne $true) { throw 'Packaged Autopilot did not enable' }
+            $off = @{ project = $status.project; instance = $status.trace.instanceId; revision = $enabled.autopilot.revision; on = $false } | ConvertTo-Json -Compress
+            $disabled = Invoke-RestMethod 'http://127.0.0.1:39777/api/autopilot' -Method Post -Headers $headers -Body $off
+            if ($disabled.autopilot.on -ne $false) { throw 'Packaged Autopilot did not disable' }
           } finally {
             if (-not $engine.HasExited) { Stop-Process -Id $engine.Id -Force }
           }

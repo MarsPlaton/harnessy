@@ -2,7 +2,7 @@ import {ProviderCatalog} from '@harnessy/providers';
 import {lstatSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname,isAbsolute,join,relative,sep} from 'node:path';
-import {setImmediate as immediate} from 'node:timers/promises';
+import {setTimeout as delay} from 'node:timers/promises';
 import assert from 'node:assert/strict';
 import {parseCompat,compatJson} from '@harnessy/journal';
 import type {TestContext} from 'node:test';
@@ -12,7 +12,7 @@ import {createRuntime,type Runtime,type RuntimeDeps,type RuntimeActions,type Run
 export const OWNER={seat:'owner',trust:'owner'} as const;
 export const completedActions:RuntimeActions={async ask(){return {ok:true,reply:'ответ',seq:1}},async merge(){return {ok:true,sha:'a'.repeat(40),mergeSha:'b'.repeat(40),branch:'main'}},async assignRole(){return {ok:true,pane:'tester',label:'тестер',model:'w1',mode:'read',mandate:1}},async afterTurn(){return 'completed'},async restorePendingAcks(){},cancelAsks(){}};
 export function deferred<T=void>(){let resolve!:(v:T|PromiseLike<T>)=>void,reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}}
-export async function until(fn:()=>boolean):Promise<void>{for(let i=0;i<200;i++){if(fn())return;await immediate()}throw Error('условие теста не наступило')}
+export async function until(fn:()=>boolean):Promise<void>{const deadline=Date.now()+20_000;while(Date.now()<deadline){if(fn())return;await delay(10)}if(fn())return;throw Error('условие теста не наступило')}
 export class FakeClock implements Clock {time=1791500000125;private seq=0;private timers=new Map<number,{due:number;fn:()=>void}>();now=()=>this.time;setTimeout(fn:()=>void,ms:number){const id=++this.seq;this.timers.set(id,{due:this.time+ms,fn});return id}clearTimeout(id:unknown){this.timers.delete(id as number)}
  advance(ms:number){this.time+=ms;for(const [id,t] of [...this.timers].sort((a,b)=>a[1].due-b[1].due))if(t.due<=this.time&&this.timers.delete(id))t.fn()}
 }

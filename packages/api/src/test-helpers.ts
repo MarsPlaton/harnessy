@@ -9,11 +9,12 @@ export {deferred,until,OWNER,FakeProvider,FakeClock} from '../../runtime/src/tes
 const clientSignals=new WeakMap<Api,AbortSignal>();
 export async function fixture(t:TestContext,options:Parameters<typeof harness>[1]&{router?:RouterSource}={}){
  // Cancel clients before teardown waits for the server, including requests still awaiting headers.
- const clients=new AbortController(),signal=AbortSignal.any([t.signal,clients.signal]);t.after(()=>clients.abort());
+ const clients=new AbortController(),signal=AbortSignal.any([t.signal,clients.signal]);let api:Api|undefined;
+ t.after(async()=>{clients.abort();if(api){clientSignals.delete(api);await api.close()}});
  const codex=new FakeProvider('codex');codex.models=async()=>[{id:'gpt-test',label:'GPT test'}];
  const h=await harness(t,{...options,deps:{...options.deps,providers:{claude:new FakeProvider(),codex,...options.deps?.providers}}});
  const provider=h.deps.providers.claude as FakeProvider,siteDir=join(h.dir,'site');mkdirSync(siteDir);writeFileSync(join(siteDir,'test.js'),'window.test = "готов";');
- const api=createApi({runtime:h.runtime,siteDir,port:0,router:options.router??{models:()=>({ok:false,reason:'списки моделей provider-router не найдены'}),health:async()=>({ok:false,reason:'программа не отвечает на /health'})}});clientSignals.set(api,signal);t.after(()=>clientSignals.delete(api));t.after(()=>api.close());await api.listen();h.deps.appUrl=api.url;
+ api=createApi({runtime:h.runtime,siteDir,port:0,router:options.router??{models:()=>({ok:false,reason:'списки моделей provider-router не найдены'}),health:async()=>({ok:false,reason:'программа не отвечает на /health'})}});clientSignals.set(api,signal);await api.listen();h.deps.appUrl=api.url;
  return {...h,provider,codex,api,siteDir}
 }
 export function noRepositoryFixture(t:TestContext,options:Parameters<typeof fixture>[1]={}){return fixture(t,{...options,noRepository:true})}
