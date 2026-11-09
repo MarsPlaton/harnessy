@@ -21,7 +21,7 @@ test('Windows decision ledger keeps the shared .harness ACL and protects only pr
  const project=mkdtempSync(join(tmpdir(),'harnessy-decision-acl-')),harness=join(project,'.harness');t.after(()=>rmSync(project,{recursive:true,force:true}));
  mkdirSync(harness);const ledger=new AutopilotDecisionLedger(project);
  assert.throws(()=>assertPrivateDirectory(harness),/unsafe Windows permissions/);
- await ledger.intent({...decision(project),cost:unknownCost});
+ await ledger.intent({...decision(ledger.project),cost:unknownCost});
  assert.throws(()=>assertPrivateDirectory(harness),/unsafe Windows permissions/);
  assert.equal(assertPrivateDirectory(join(harness,'state')).isDirectory(),true);
 });
