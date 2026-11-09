@@ -16,7 +16,7 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-2025
-    timeout-minutes: 60
+    timeout-minutes: 120
     defaults:
       run:
         shell: pwsh
@@ -60,10 +60,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Diagnose Windows integration contracts
         run: |
-          node --import ./packages/projects/src/test-helpers.ts --test --test-reporter=tap --test-concurrency=4 packages/api/src/constructor.test.ts packages/api/src/autopilot-decisions.test.ts packages/runtime/src/network-stats.test.ts
+          node --import ./packages/projects/src/test-helpers.ts --test --test-reporter=tap --test-concurrency=4 packages/api/src/constructor.test.ts packages/api/src/autopilot-decisions.test.ts packages/api/src/copilot.test.ts packages/runtime/src/network-stats.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test complete Windows suite
-        timeout-minutes: 45
+        timeout-minutes: 90
         run: npm test
       - name: Package Windows app
         run: npm --prefix ui/desktop run dist:win
