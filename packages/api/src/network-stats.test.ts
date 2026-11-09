@@ -49,4 +49,5 @@ test('22h/22d: actual reserve counters reach HTTP and SQLite once across paralle
  const saved=new NetworkStats(h.runtime.settings,h.runtime.networkStats.path);t.after(()=>saved.close());const persistent=saved.read('hour');
  for(const row of rows){const publicRow=response.body.providers.find((r:any)=>r.provider===row.provider).exits.find((r:any)=>r.exitId===row.exit),stored=persistent.providers.find(r=>r.provider===row.provider)!.exits.find(r=>r.exitId===row.exit)!;for(const key of ['switches','reserveMs','rateLimits','silences'] as const){assert.equal(publicRow.metrics[key].value,row[key],key);assert.equal(stored.metrics[key].value,row[key],key)}}
  const again=(await call(h.api,'/api/network/stats?period=hour')).body;assert.deepEqual(again.exits.map((r:any)=>({exitId:r.exitId,metrics:r.metrics})),response.body.exits.map((r:any)=>({exitId:r.exitId,metrics:r.metrics})));assert.equal(again.exits.find((r:any)=>r.exitId==='a').metrics.http429.value,null,'policy counter does not invent an HTTP response');
+ saved.close();
 });

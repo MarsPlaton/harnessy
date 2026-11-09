@@ -56,7 +56,7 @@ test('TS-48.1: design-code specimen preserves the project, standalone and other-
 });
 
 test('TS-48.1: folder keyboard and unclipped menu in four viewports',
- {timeout:60_000,skip:existsSync(electron)?false:'Electron is not installed; set HARNESSY_TEST_ELECTRON'},async t=>{
+ {timeout:process.platform==='win32'?180_000:60_000,skip:existsSync(electron)?false:'Electron is not installed; set HARNESSY_TEST_ELECTRON'},async t=>{
   const profile=mkdtempSync(join(tmpdir(),'harnessy-sidebar-browser-'));
   t.after(()=>rmSync(profile,{recursive:true,force:true}));
   const env:NodeJS.ProcessEnv={...process.env,HARNESSY_TEST_WINDOW:'hidden',SIDEBAR_SITE:testSite(),SIDEBAR_BROWSER_USER_DATA:profile};

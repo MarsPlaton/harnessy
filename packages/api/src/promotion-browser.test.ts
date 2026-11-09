@@ -13,7 +13,7 @@ const root=fileURLToPath(new URL('../../../',import.meta.url));
 const electron=process.env.HARNESSY_TEST_ELECTRON||join(root,'ui/desktop/node_modules/.bin/electron');
 
 test('TS-47.1: browser resumes the saved promotion from the reply after the intro',
- {timeout:60_000,skip:existsSync(electron)?false:'Electron is not installed; set HARNESSY_TEST_ELECTRON'},async t=>{
+ {timeout:process.platform==='win32'?180_000:60_000,skip:existsSync(electron)?false:'Electron is not installed; set HARNESSY_TEST_ELECTRON'},async t=>{
  const h=await noRepositoryFixture(t,{deps:{clock:systemClock}}),r=h.runtime;
  await r.settingsPatch('owner',{releaseUnderstood_0_1_0_alpha:true},OWNER);
  r.roomSet({model:'w1'},OWNER);r.registry.get('room')!.record('me','Обсуждение проекта');r.registry.get('room')!.record('ai','Ответ до назначения');

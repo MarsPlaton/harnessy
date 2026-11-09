@@ -8,9 +8,9 @@ import {CliStateStore} from '../../providers/src/cli/state.ts';
 import {ProviderCatalog,LoginTerminal} from '@harnessy/providers';
 import {copilotFixture} from '../../providers/src/copilot-test-helpers.ts';
 import {fixture,call,sse} from './test-helpers.ts';
-// 327: worst observed case in a loaded full run was 5688.05 ms;
-// eight concurrent file runs at load 35.60 peaked at 1517.86 ms. Keep twice the larger measurement.
-const copilotWorstUnderLoadMs=5689,copilotTimeoutMs=copilotWorstUnderLoadMs*2;
+// 327: the process fixture takes about 11 seconds on Windows even in isolation;
+// leave headroom for concurrent file runs and private-state ACL checks.
+const copilotWorstUnderLoadMs=5689,copilotTimeoutMs=process.platform==='win32'?30_000:copilotWorstUnderLoadMs*2;
 // 307 explicitly restores probe after owner approval; state remains private.
 test('307: Copilot HTTP probe needs owner approval, preserves state, and keeps metadata available',{timeout:copilotTimeoutMs},async t=>{
  const cli=await copilotFixture(t),scripts:string[]=[],h=await fixture(t,{deps:{providerCatalog:new ProviderCatalog([cli.entry]),loginTerminal:new LoginTerminal({platform:'darwin',temporaryDirectory:cli.dir,open:async path=>{scripts.push(readFileSync(path,'utf8'))}})}}),stream=await sse(h.api);t.after(()=>stream.close());

@@ -16,7 +16,7 @@ test('TS-45.4: no-repository Git probes are opt-in and reject writes, outside pa
  await assert.rejects(fixture(t,{deps:{gitops:first.deps.gitops!}}),/custom GitOps conflicts/);
  mkdirSync(join(first.dir,'.git'));await assert.rejects(first.deps.gitops!.repoRoot(first.dir),/Git repository exists/);
  assert.equal(await second.deps.gitops!.repoRoot(second.dir),null);
- symlinkSync('missing-target',join(second.dir,'.git'));await assert.rejects(second.deps.gitops!.repoRoot(second.dir),/Git repository exists/);
+ symlinkSync('missing-target',join(second.dir,'.git'),process.platform==='win32'?'junction':undefined);await assert.rejects(second.deps.gitops!.repoRoot(second.dir),/Git repository exists/);
 });
 
 async function blocked(t:Parameters<typeof fixture>[0]){

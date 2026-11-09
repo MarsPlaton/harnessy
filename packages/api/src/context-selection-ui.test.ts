@@ -50,7 +50,7 @@ test('TS-51.C: context parts use bound facts, report missing data and ignore lat
 });
 
 const electron=process.env.HARNESSY_TEST_ELECTRON||fileURLToPath(new URL('../../../ui/desktop/node_modules/.bin/electron',import.meta.url));
-test('TS-51.C: real context card and transfer history fit four sizes with isolated engine data',{timeout:60_000,skip:existsSync(electron)?false:'Electron is not installed'},async t=>{
+test('TS-51.C: real context card and transfer history fit four sizes with isolated engine data',{timeout:process.platform==='win32'?180_000:60_000,skip:existsSync(electron)?false:'Electron is not installed'},async t=>{
  const h=await fixture(t,{seats:'  worker: {role: executor, vendor: claude, label: Исполнитель, model: w1, mode: read, digest: true, instructions: roles/worker.md}',before:dir=>{mkdirSync(join(dir,'.harness','roles'),{recursive:true});mkdirSync(join(dir,'docs'));writeFileSync(join(dir,'.harness','roles','worker.md'),'Инструкция роли');writeFileSync(join(dir,'docs','пример.md'),'Документ');}}),r=h.runtime,pane=r.registry.get('worker')!;
  await r.settingsPatch('owner',{releaseUnderstood_0_1_0_alpha:true},OWNER);pane.record('me','Первый вопрос');pane.record('ai','Сохранённый ответ');
  const image=await call(h.api,'/api/attachments',{body:{base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='}});assert.equal(image.status,201);pane.transcript[0]!.attachments=[image.body];r.project.state.saveChats(r.registry);const cid=r.project.state.chats.active.worker!;

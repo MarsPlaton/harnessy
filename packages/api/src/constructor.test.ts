@@ -40,8 +40,8 @@ test('39.2: only the configured missing instruction may be created; absent paren
 
 for(const swap of ['outside','parent','intent-failure'])test('39.2: '+swap+' cannot redirect a versioned instruction write',async t=>{
  const h=await setup(t),outside=await fixture(t),foreign=join(outside.dir,'untouched.md');writeFileSync(foreign,'Secret');
- if(swap==='outside'){unlinkSync(file(h));symlinkSync(foreign,file(h));assert.equal((await get(h)).body.code,'file_outside');assert.equal((await update(h)).body.code,'file_outside')}
- else{const append=h.runtime.journal.append.bind(h.runtime.journal);let once=true;h.runtime.journal.append=input=>{const r=append(input);if(once&&input.origin==='instruction-update'){once=false;if(swap==='intent-failure')throw Error('lost before file write');renameSync(join(h.dir,'.harness/roles'),join(h.dir,'.harness/saved'));symlinkSync(outside.dir,join(h.dir,'.harness/roles'))}return r};const r=await update(h);assert.equal(r.body.ok,false);if(swap==='parent')assert.equal(r.body.code,'target_changed');else assert.equal((await get(h)).body.hash,hash('Original instruction'))}
+ if(swap==='outside'){unlinkSync(file(h));try{symlinkSync(foreign,file(h))}catch(error){if(process.platform==='win32'&&(error as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink privilege unavailable');return}throw error}assert.equal((await get(h)).body.code,'file_outside');assert.equal((await update(h)).body.code,'file_outside')}
+ else{const append=h.runtime.journal.append.bind(h.runtime.journal);let once=true;h.runtime.journal.append=input=>{const r=append(input);if(once&&input.origin==='instruction-update'){once=false;if(swap==='intent-failure')throw Error('lost before file write');renameSync(join(h.dir,'.harness/roles'),join(h.dir,'.harness/saved'));symlinkSync(outside.dir,join(h.dir,'.harness/roles'),process.platform==='win32'?'junction':'dir')}return r};const r=await update(h);assert.equal(r.body.ok,false);if(swap==='parent')assert.equal(r.body.code,'target_changed');else assert.equal((await get(h)).body.hash,hash('Original instruction'))}
  assert.equal(readFileSync(foreign,'utf8'),'Secret');
 });
 

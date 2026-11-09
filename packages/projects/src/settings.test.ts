@@ -26,8 +26,8 @@ test('[19,26,30] nonprintable key errors use Python repr and owner write failure
  }finally{t.close()}
 });
 
-test('[r2:3] parallel settings patches via a file symlink preserve the link and both updates',async()=>{
- const t=temp();try{const real=join(t.root,'real.json'),alias=join(t.root,'alias.json');writeFileSync(real,'{"existing": true}');symlinkSync('real.json',alias);
+test('[r2:3] parallel settings patches via a file symlink preserve the link and both updates',async ctx=>{
+ const t=temp();try{const real=join(t.root,'real.json'),alias=join(t.root,'alias.json');writeFileSync(real,'{"existing": true}');try{symlinkSync('real.json',alias)}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){ctx.skip('Windows file symlink privilege is unavailable');return}throw e}
  await Promise.all([new Settings(alias).patch('owner',{first:1}),new Settings(real).patch('owner',{second:2})]);
  assert.equal(lstatSync(alias).isSymbolicLink(),true);assert.deepEqual(readFileSync(alias),readFileSync(real));assert.deepEqual(new Settings(real).effective(),{existing:true,first:1,second:2});
  const target=join(t.root,'new','target.json'),dangling=join(t.root,'dangling.json');symlinkSync(target,dangling);await new Settings(dangling).patch('owner',{created:1});assert.equal(lstatSync(dangling).isSymbolicLink(),true);assert.deepEqual(readFileSync(dangling),readFileSync(target));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,symlinkSync,rmSync,realpathSync,chmodSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,rmdirSync,writeFileSync,readFileSync,symlinkSync,rmSync,realpathSync,chmodSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {ensureLine} from '@harnessy/team';
@@ -11,6 +11,7 @@ const parts:ProjectSection[]=['docs','artifacts','memory','research'];
 function fixture(t:TestContext){const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-sections-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir}
 const put=(dir:string,path:string,text:string|Buffer)=>{const file=join(dir,'.harness',path);mkdirSync(join(file,'..'),{recursive:true});writeFileSync(file,text);return file};
 const refusal=(code:string)=>(e:any)=>e.code===code&&e.status===(code==='section_outside'?403:409);
+const link=(t:TestContext,target:string,path:string,directory=false)=>{try{symlinkSync(target,path,process.platform==='win32'&&directory?'junction':directory?'dir':'file');return true}catch(e){if(process.platform==='win32'&&(e as NodeJS.ErrnoException).code==='EPERM'){t.skip('Windows file symlink privilege is unavailable');return false}throw e}};
 
 test('136/140: all four missing sections are empty, read-only and available without a team',async t=>{
  const dir=fixture(t);for(const section of parts){const r=await readProjectSection(dir,section);assert.equal(r.empty,true);assert.deepEqual(r.items,[]);assert.deepEqual(r.limited,[])}
@@ -33,18 +34,18 @@ test('137: initial ensureLine memory ignores whitespace, not real decisions; the
 
 for(const path of ['.harness','.harness/docs','.harness/docs/file.txt','.harness/docs/nested','.harness/evidence','.harness/MEMORY.md','.harness/research'])test('136: refuses outside symlink at '+path+' including a sibling with the same prefix',async t=>{
  const dir=fixture(t),outside=dir+'-other';mkdirSync(outside);t.after(()=>rmSync(outside,{recursive:true,force:true}));writeFileSync(join(outside,'secret.txt'),'must not leave the other project');
- mkdirSync(join(dir,path,'..'),{recursive:true});symlinkSync(path.endsWith('.txt')||path.endsWith('.md')?join(outside,'secret.txt'):outside,join(dir,path));
+ mkdirSync(join(dir,path,'..'),{recursive:true});const file=path.endsWith('.txt')||path.endsWith('.md');if(!link(t,file?join(outside,'secret.txt'):outside,join(dir,path),!file))return;
  const section:ProjectSection=path.includes('evidence')?'artifacts':path.includes('MEMORY')?'memory':path.includes('research')?'research':'docs';await assert.rejects(readProjectSection(dir,section),refusal('section_outside'));
 });
 
 test('136: allowed internal links and a symlink to the project itself remain readable',async t=>{
- const dir=fixture(t);put(dir,'docs/real.txt','real');symlinkSync(join(dir,'.harness','docs','real.txt'),join(dir,'.harness','docs','alias.txt'));const alias=dir+'-link';symlinkSync(dir,alias);t.after(()=>rmSync(alias));
+ const dir=fixture(t);put(dir,'docs/real.txt','real');if(!link(t,join(dir,'.harness','docs','real.txt'),join(dir,'.harness','docs','alias.txt')))return;const alias=dir+'-link';if(!link(t,dir,alias,true))return;t.after(()=>process.platform==='win32'?rmdirSync(alias):rmSync(alias));
  const r=await readProjectSection(alias,'docs');assert.deepEqual(r.items.map(i=>i.text),['real','real']);
 });
 
 test('136: dangling links, unreadable text and invalid memory are failures, never an empty section',async t=>{
- const dir=fixture(t);mkdirSync(join(dir,'.harness','docs'),{recursive:true});const broken=join(dir,'.harness','docs','broken');symlinkSync(join(dir,'missing'),broken);await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));rmSync(broken);
- symlinkSync(join(dir,'.harness','docs'),join(dir,'.harness','docs','loop'));await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));rmSync(join(dir,'.harness','docs','loop'));
+ const dir=fixture(t);mkdirSync(join(dir,'.harness','docs'),{recursive:true});const broken=join(dir,'.harness','docs','broken');if(!link(t,join(dir,'missing'),broken))return;await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));rmSync(broken);
+ if(!link(t,join(dir,'.harness','docs'),join(dir,'.harness','docs','loop'),true))return;await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));if(process.platform==='win32')rmdirSync(join(dir,'.harness','docs','loop'));else rmSync(join(dir,'.harness','docs','loop'));
  if(process.platform!=='win32'){const p=put(dir,'docs/locked.txt','private');chmodSync(p,0);try{await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'))}finally{chmodSync(p,0o600)}}
  put(dir,'MEMORY.md',Buffer.from([0xff,0]));await assert.rejects(readProjectSection(dir,'memory'),refusal('section_unreadable'));
 });
