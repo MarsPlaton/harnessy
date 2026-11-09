@@ -13,7 +13,7 @@ export const opencodeAuthText='┌  Credentials /fixture/auth.json\n│\n●  Fi
 export const opencodeNoAuthText='┌  Credentials /fixture/auth.json\n│\n└  0 credentials\n';
 export const opencodeModelText='opencode/free-model\nfixture/~account/models/model:variant\n';
 export function opencodeFixture(t:TestContext){
- const dir=mkdtempSync(join(tmpdir(),'harnessy-opencode-')),binary=join(dir,'opencode fixture'),log=join(dir,'calls.jsonl'),state=join(dir,'metadata.json');writeFileSync(log,'');
+ const dir=mkdtempSync(join(tmpdir(),'harnessy-opencode-')),binary=join(dir,'opencode fixture.cjs'),log=join(dir,'calls.jsonl'),state=join(dir,'metadata.json');writeFileSync(log,'');
  const update=(patch:Record<string,unknown>)=>writeFileSync(state,JSON.stringify({version:'1.18.4',auth:opencodeAuthText,models:opencodeModelText,...patch}));update({});
  writeFileSync(binary,'#!'+process.execPath+'\n'+String.raw`
  const fs=require('node:fs'),args=process.argv.slice(2),state=JSON.parse(fs.readFileSync(process.env.OPENCODE_FIXTURE_STATE,'utf8'));

@@ -9,7 +9,7 @@ import {geminiVersion,GEMINI,GEMINI_UNAVAILABLE,GEMINI_MODELS_UNAVAILABLE} from 
 import {readCliMetadata} from './cli/query.ts';
 
 test('264: Gemini version comes from the process, not the inventory; no prompt is sent',async t=>{
- const dir=mkdtempSync(join(tmpdir(),'harnessy-gemini-version-')),binary=join(dir,'gemini');t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const dir=mkdtempSync(join(tmpdir(),'harnessy-gemini-version-')),binary=join(dir,'gemini.cjs');t.after(()=>rmSync(dir,{recursive:true,force:true}));
  writeFileSync(binary,'#!'+process.execPath+'\nif(JSON.stringify(process.argv.slice(2))!==JSON.stringify(["--version"]))process.exit(93);console.log("0.55.1");',{mode:0o700});
  assert.equal(await readCliMetadata(binary,[],geminiVersion,{cwd:dir}),'0.55.1');
  writeFileSync(binary,'#!'+process.execPath+'\nconsole.log("0.56.0-preview.2");',{mode:0o700});assert.equal(await readCliMetadata(binary,[],geminiVersion,{cwd:dir}),'0.56.0-preview.2');

@@ -1,6 +1,6 @@
 import {buildTestSite} from '../../api/src/site-test-helpers.ts';
 import {createHash} from 'node:crypto';
-import {lstatSync,mkdtempSync,readFileSync,readdirSync,readlinkSync,rmSync} from 'node:fs';
+import {existsSync,lstatSync,mkdtempSync,readFileSync,readdirSync,readlinkSync,rmSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {homedir,tmpdir} from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -32,6 +32,10 @@ export function checkOwnerFiles(run:()=>number,options:{home?:string;mode?:strin
  return code||((!before||!after||changed.length)&&(options.mode??process.env.HARNESS_OWNER_FILES_CHECK)!=='warn'?1:0);
 }
 const ownFile=fileURLToPath(import.meta.url),main=process.argv[1]&&resolve(process.argv[1])===ownFile;
+if(process.platform==='win32'&&!process.env.HARNESSY_TEST_ELECTRON){
+ const electron=fileURLToPath(new URL('../../../ui/desktop/node_modules/electron/dist/electron.exe',import.meta.url));
+ if(existsSync(electron))process.env.HARNESSY_TEST_ELECTRON=electron;
+}
 if(main&&process.argv[2]==='run'){
  // One full run, with isolation installed before test modules load in each worker.
  process.exitCode=checkOwnerFiles(()=>{

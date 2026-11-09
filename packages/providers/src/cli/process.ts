@@ -1,4 +1,5 @@
 import {spawn} from 'node:child_process';
+import {extname} from 'node:path';
 import {ProviderError} from '../types.ts';
 import type {CliExecutor} from './types.ts';
 import {MetadataRpc} from './rpc.ts';
@@ -6,7 +7,8 @@ import {MetadataRpc} from './rpc.ts';
 /** No shell, bounded output, and termination of the per-turn process group. */
 export const executeCli:CliExecutor=(request,signal,hooks={})=>new Promise((resolve,reject)=>{
  if(signal.aborted){reject(new ProviderError('cancelled','ход отменён'));return}
- const child=spawn(request.binary,request.args,{cwd:request.cwd,env:request.env,stdio:'pipe',shell:false,detached:process.platform!=='win32'});
+ const nodeScript=process.platform==='win32'&&['.js','.mjs','.cjs'].includes(extname(request.binary).toLowerCase());
+ const child=spawn(nodeScript?process.execPath:request.binary,nodeScript?[request.binary,...request.args]:request.args,{cwd:request.cwd,env:request.env,stdio:'pipe',shell:false,detached:process.platform!=='win32'});
  let stdout='',stderr='',bytes=0,error:ProviderError|undefined,killTimer:NodeJS.Timeout|undefined;
  const decoder=new TextDecoder('utf-8',{fatal:true}),errDecoder=new TextDecoder('utf-8',{fatal:true});
  const rpc=request.rpcMethod?new MetadataRpc():null;

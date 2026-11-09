@@ -10,7 +10,7 @@ import {cliEntry} from './catalog.ts';
 export const QWEN_TEST_TIMEOUT_MS=2367*8;
 export const QWEN_SESSION='123e4567-e89b-12d3-a456-426614174000';
 export function qwenFixture(t:TestContext,scenario='ok'){
- const dir=mkdtempSync(join(tmpdir(),'harnessy-qwen-')),binary=join(dir,'qwen'),captureFile=join(dir,'calls.jsonl');writeFileSync(captureFile,'');
+ const dir=mkdtempSync(join(tmpdir(),'harnessy-qwen-')),binary=join(dir,'qwen.cjs'),captureFile=join(dir,'calls.jsonl');writeFileSync(captureFile,'');
  writeFileSync(binary,'#!'+process.execPath+'\n'+String.raw`
  const fs=require('node:fs'),{spawn}=require('node:child_process');
  const args=process.argv.slice(2),get=k=>args[args.indexOf(k)+1],scenario=process.env.QWEN_FIXTURE_SCENARIO;

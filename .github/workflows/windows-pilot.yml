@@ -50,6 +50,9 @@ jobs:
           )
           node --import ./packages/projects/src/test-helpers.ts --test --test-concurrency=4 $tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test complete Windows suite
+        timeout-minutes: 20
+        run: npm test
       - name: Package Windows app
         run: npm --prefix ui/desktop run dist:win
       - name: Smoke test packaged engine
@@ -89,3 +92,19 @@ jobs:
           $version = (Get-Content -Raw 'ui/desktop/package.json' | ConvertFrom-Json).version
           $zip = Get-Item -LiteralPath "ui/desktop/release/Harnessy-alpha-$version-x64.zip"
           if ($zip.Length -lt 100MB) { throw 'Windows ZIP is incomplete' }
+
+  macos-tests:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install project dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install desktop dependencies
+        run: npm --prefix ui/desktop ci --no-audit --no-fund
+      - name: Test complete macOS suite
+        run: npm test
