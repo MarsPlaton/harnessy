@@ -11,7 +11,8 @@ app.whenReady().then(async()=>{
  win.webContents.session.webRequest.onBeforeRequest((request,done)=>done({cancel:/^https?:/.test(request.url)&&!request.url.startsWith(base+'/')}));
  const evaluate=code=>win.webContents.executeJavaScript(code,true);
  const wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('(async()=>Boolean(await ('+expression+')))()'))return;await new Promise(resolve=>setTimeout(resolve,50))}throw Error('Timed out: '+expression)};
- const send=async text=>{await evaluate(`(()=>{const input=document.querySelector('.frame.cur .live-in');input.value=${JSON.stringify(text)};input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`)};
+ // Deterministic DOM dispatch exercises the send handler; context-facts-browser-driver covers native input delivery.
+ const send=async text=>{await evaluate(`(()=>{const input=document.querySelector('.frame.cur .live-in');input.value=${JSON.stringify(text)};input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();const enter=new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});input.dispatchEvent(enter);if(!enter.defaultPrevented)throw Error('Enter was not handled')})()`)};
  await win.loadURL(base+'/sketches/proto/01-chat.html');
  await wait("window.LIVE?.H.on&&!LIVE.H.snapshotOnly&&!document.documentElement.hasAttribute('data-live-pending')");
  await evaluate("(async()=>{LIVE.S.ui.pane='worker';LIVE.S.ui.direct={worker:true};LIVE.pickPane();LIVE.hStatus();await LIVE.loadChat({onboard:false});CX.render()})()");

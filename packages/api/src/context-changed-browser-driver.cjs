@@ -10,7 +10,8 @@ app.whenReady().then(async()=>{
  const evaluate=code=>win.webContents.executeJavaScript(code,true),wait=async expression=>{for(let n=0;n<200;n++){if(await evaluate('Boolean('+expression+')'))return;await new Promise(r=>setTimeout(r,50))}throw Error('Timed out: '+expression)};
  const select=async()=>{await wait("window.LIVE?.H.on&&!LIVE.H.snapshotOnly&&!document.documentElement.hasAttribute('data-live-pending')");await evaluate("(async()=>{LIVE.S.ui.pane='worker';LIVE.S.ui.direct={worker:true};LIVE.pickPane();LIVE.hStatus();await LIVE.loadChat({onboard:false});CX.render()})()")};
  await win.loadURL(base+'/sketches/proto/01-chat.html');await select();
- await evaluate("(()=>{const ta=document.querySelector('.frame.cur .live-in');ta.value='Сжать контекст';ta.dispatchEvent(new Event('input',{bubbles:true}));ta.focus();ta.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()");
+ // Deterministic DOM dispatch exercises the send handler; context-facts-browser-driver covers native input delivery.
+ await evaluate("(()=>{const ta=document.querySelector('.frame.cur .live-in');ta.value='Сжать контекст';ta.dispatchEvent(new Event('input',{bubbles:true}));ta.focus();const enter=new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});ta.dispatchEvent(enter);if(!enter.defaultPrevented)throw Error('Enter was not handled')})()");
  await wait("!LIVE.H.cur&&LIVE.S.chat.some(m=>m.contextChangeId&&m.html.includes('Контекст сжат провайдером'))");
  const receiptIds=await evaluate("LIVE.S.chat.filter(m=>m.contextChangeId).map(m=>m.contextChangeId)");
  if(receiptIds.length!==3||new Set(receiptIds).size!==3)throw Error('Missing or duplicated live receipts: '+JSON.stringify(receiptIds));
