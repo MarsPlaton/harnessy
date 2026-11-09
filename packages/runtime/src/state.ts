@@ -1,7 +1,7 @@
-import {readFileSync,mkdirSync,openSync,fsyncSync,closeSync,renameSync,statSync} from 'node:fs';
+import {readFileSync,mkdirSync,openSync,fsyncSync,closeSync,statSync} from 'node:fs';
 import {dirname,isAbsolute,join,relative,sep} from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
-import {atomicWrite} from '@harnessy/team';
+import {atomicWrite,renameWithRetry} from '@harnessy/team';
 import {isConversationMessage} from '@harnessy/context';
 import {compatJson,parseCompat,orderedClone,orderedKeys,pythonTrim,type Journal} from '@harnessy/journal';
 import {object,message,RuntimeError,slice} from './errors.ts';
@@ -12,7 +12,7 @@ export interface StateIO {read(path:string):string;write(path:string,text:string
 function syncDirectory(path:string){if(process.platform==='win32')return;const fd=openSync(dirname(path),'r');try{fsyncSync(fd)}finally{closeSync(fd)}}
 export const diskIO:StateIO={read:path=>new TextDecoder('utf-8',{fatal:true}).decode(readFileSync(path)),write(path,text){
  mkdirSync(dirname(path),{recursive:true});atomicWrite(path,text);syncDirectory(path)
-},rename(from,to){renameSync(from,to);syncDirectory(to)}};
+},rename(from,to){renameWithRetry(from,to);syncDirectory(to)}};
 export interface Receipt {turnInstanceId:string;recordSeqs:number[];effectsPending:boolean;interrupted:boolean;nextSeen:Record<string,number>}
 export type TurnOutcome='ok'|'interrupted'|'error';
 export interface ArtifactRefs {project:string;chat:string;turnInstanceId:string;paths:string[]}

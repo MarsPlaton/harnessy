@@ -27,14 +27,15 @@ export async function withPathLock<T>(path:string,fn:(lock:PathLock)=>T|Promise<
  const lock=Object.freeze({path:key}) as PathLock;active.add(lock);
  try{return await fn(lock)}finally{active.delete(lock);release();if(tails.get(key)===current)tails.delete(key)}
 }
+export function renameWithRetry(from:string,to:string,replace:(from:string,to:string)=>void=renameSync):void {
+ for(let attempt=0;;attempt++)try{replace(from,to);return}catch(error){
+  const code=(error as NodeJS.ErrnoException).code;
+  if(process.platform!=='win32'||!['EPERM','EACCES'].includes(String(code))||attempt>=9)throw error;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
+ }
+}
 export function atomicWrite(path:string,text:string,replace:(from:string,to:string)=>void=renameSync):void {
  const target=canonicalPath(path),temp=target+'.'+randomUUID()+'.tmp';let fd:number|undefined;
- try{fd=openSync(temp,'wx');writeFileSync(fd,text,'utf8');fsyncSync(fd);closeSync(fd);fd=undefined;
-  for(let attempt=0;;attempt++)try{replace(temp,target);break}catch(error){
-   const code=(error as NodeJS.ErrnoException).code;
-   if(process.platform!=='win32'||!['EPERM','EACCES'].includes(String(code))||attempt>=9)throw error;
-   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
-  }
- }
+ try{fd=openSync(temp,'wx');writeFileSync(fd,text,'utf8');fsyncSync(fd);closeSync(fd);fd=undefined;renameWithRetry(temp,target,replace)}
  finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}}
 }

@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {setImmediate as tick} from 'node:timers/promises';
-import {atomicWrite,canonicalPath,withPathLock,assertPathLock,type PathLock} from './locks.ts';
+import {atomicWrite,canonicalPath,renameWithRetry,withPathLock,assertPathLock,type PathLock} from './locks.ts';
 import {ensureLineLocked} from './templates.ts';
 
 test('[r2:1] detached child cannot inherit ownership after release; expired and forged tokens refuse',async()=>{
@@ -33,10 +33,15 @@ test('Windows atomic replacement survives a short-lived reader in another proces
  const root=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-rename-'))),path=join(root,'state.json');
  writeFileSync(path,'before');
  const child=spawn(process.execPath,['-e',"const fs=require('node:fs');const fd=fs.openSync(process.argv[1],'r');process.stdout.write('ready\\n');setTimeout(()=>fs.closeSync(fd),200)",path],{stdio:['ignore','pipe','pipe'],windowsHide:true});
+ const exited=once(child,'exit');
  try{
   await once(child.stdout!,'data');
   atomicWrite(path,'after');
   assert.equal(readFileSync(path,'utf8'),'after');
-  const [code]=await once(child,'exit');assert.equal(code,0);
+  const [code]=await exited;assert.equal(code,0);
+  const source=join(root,'repair.json');writeFileSync(source,'repaired');
+  const holder=spawn(process.execPath,['-e',"const fs=require('node:fs');const fd=fs.openSync(process.argv[1],'r');process.stdout.write('ready\\n');setTimeout(()=>fs.closeSync(fd),200)",path],{stdio:['ignore','pipe','pipe'],windowsHide:true});
+  const holderExited=once(holder,'exit');
+  try{await once(holder.stdout!,'data');renameWithRetry(source,path);assert.equal(readFileSync(path,'utf8'),'repaired');const [exit]=await holderExited;assert.equal(exit,0)}finally{if(holder.exitCode===null)holder.kill()}
  }finally{if(child.exitCode===null)child.kill();rmSync(root,{recursive:true,force:true})}
 });
