@@ -7,7 +7,7 @@ import {SshTunnels} from './ssh-tunnels.ts';
 import {sshDouble} from './ssh-test-helpers.ts';
 import {listen,socks} from './network-test-helpers.ts';
 
-test('22c integration: Runtime uses the real SSH manager, SOCKS URL and shutdown; no external SSH', {timeout:20000},async t=>{
+test('22c integration: Runtime uses the real SSH manager, SOCKS URL and shutdown; no external SSH', {timeout:20000,skip:process.platform==='win32'},async t=>{
  const target=http.createServer((_q,r)=>r.end('through real tunnel manager')),port=await listen(t,target),upstream=await socks(t,port),f=sshDouble(t),sockets=new Set<net.Socket>(),servers:net.Server[]=[];
  const tunnels=new SshTunnels({home:f.home,temporaryDirectory:f.directory,spawn:command=>{
   const child=f.spawn(command);

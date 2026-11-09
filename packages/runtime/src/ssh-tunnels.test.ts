@@ -1,4 +1,4 @@
-import test from 'node:test';
+import platformTest from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,statSync,symlinkSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
@@ -7,6 +7,15 @@ import {execFileSync} from 'node:child_process';
 import {SshTunnels} from './ssh-tunnels.ts';
 import {sshDouble,sshBinary,stateWhen} from './ssh-test-helpers.ts';
 import {harness} from './test-helpers.ts';
+
+// The SSH manager uses Unix process ownership and /usr/bin/ssh; Windows pilot keeps it unavailable.
+const test=process.platform==='win32'?platformTest.skip:platformTest;
+platformTest('Windows SSH tunnels fail closed until a Windows owner/process design exists',{skip:process.platform!=='win32'},async t=>{
+ const f=sshDouble(t);
+ await assert.rejects(f.tunnels.ensure('vps',f.config),{code:'ssh_unavailable'});
+ assert.equal(f.tunnels.get('vps')?.url,null);
+ assert.equal(f.commands.length,0);
+});
 
 test('22b: lazy shared startup uses strict owner host keys, no shell/config fallback, and a private master forwarding acknowledgment',async t=>{
  const f=sshDouble(t);assert.equal(f.commands.length,0);const before=readFileSync(join(f.keys,'known_hosts'),'utf8'),[a,b]=await Promise.all([f.tunnels.ensure('vps',f.config),f.tunnels.ensure('vps',f.config)]);

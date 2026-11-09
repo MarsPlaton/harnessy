@@ -1,4 +1,4 @@
-import test from 'node:test';
+import platformTest from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {join} from 'node:path';
@@ -6,6 +6,8 @@ import {fixture,call,deferred} from './test-helpers.ts';
 import {sshBinary,sshDouble} from '../../runtime/src/ssh-test-helpers.ts';
 import {SshTunnels} from '../../runtime/src/ssh-tunnels.ts';
 import {networkRevision} from '@harnessy/projects';
+// These lifecycle scenarios require the Unix SSH tunnel implementation.
+const test=process.platform==='win32'?platformTest.skip:platformTest;
 const opts={timeout:15000},root='/api/network';
 const output=(input:string)=>({code:0,signal:null,stderr:'',stdout:input.includes('ipapi.co')?'{"country_name":"Fixture"}\n0.01':'{"ip":"192.0.2.1"}\n0.02'});
 async function saved(h:Awaited<ReturnType<typeof fixture>>,config:{host:string;port:number;user:string;keyPath:string}){

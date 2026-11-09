@@ -49,6 +49,14 @@ test('TS-30 r2: packaged generic CLI bridge inherits Electron Node mode',async t
  const rows=f.capture();for(const row of rows.filter(row=>row.action))assert.deepEqual(row.electronEnv,[]);assert.equal(rows.find(row=>row.configPath)!.runAsNode,'1');
 });
 
+test('Windows .js CLI target re-enters Electron as Node even when provider env was stripped',{skip:process.platform!=='win32'},async t=>{
+ const f=await cliFixture(t),script=join(f.dir,'target.js'),previous=process.env.ELECTRON_RUN_AS_NODE;
+ writeFileSync(script,'process.stdout.write(process.env.ELECTRON_RUN_AS_NODE ?? "missing")');
+ process.env.ELECTRON_RUN_AS_NODE='1';
+ try{const result=await executeCli({binary:script,args:[],cwd:f.dir,env:{},timeoutMs:3000,maxBytes:100},new AbortController().signal);assert.equal(result.stdout,'1')}
+ finally{if(previous===undefined)delete process.env.ELECTRON_RUN_AS_NODE;else process.env.ELECTRON_RUN_AS_NODE=previous}
+});
+
 test('259: all mode is an explicit flag choice, metadata nonzero exit is refused unless descriptor declares it',async t=>{
  const f=await cliFixture(t);f.seat.mode='all';await f.provider.runTurn(f.seat,'hello',f.ctx);const args=f.capture().find(x=>x.action==='turn')!.args as string[];assert.ok(args.includes('all'));
  const deps={cwd:f.dir,env:f.env,execute:async()=>({stdout:'{"loggedIn":false}',stderr:'',code:1,signal:null})},p=new CliProvider(f.description,deps);t.after(()=>p.close());await assert.rejects(p.auth(),{code:'protocol'});

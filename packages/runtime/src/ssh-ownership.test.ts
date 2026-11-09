@@ -1,4 +1,4 @@
-import test from 'node:test';
+import platformTest from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
@@ -11,6 +11,9 @@ import {sshBinary,sshDouble} from './ssh-test-helpers.ts';
 import {engineOwner,processOwner,saveOwnership,recoverSshDirectories,type SshOwnership} from './ssh-ownership.ts';
 import type {TestContext} from 'node:test';
 import {trustedSshDirectory} from '@harnessy/projects';
+
+// Unix PID/UID and process-group recovery is not part of the Windows subscription pilot.
+const test=process.platform==='win32'?platformTest.skip:platformTest;
 
 const absent=(path:string)=>new Promise<void>(resolve=>{const watcher=watch(dirname(path),()=>{if(!existsSync(path)){watcher.close();resolve()}});if(!existsSync(path)){watcher.close();resolve()}});
 async function engine(t:TestContext){

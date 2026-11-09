@@ -34,6 +34,16 @@ test('Windows ACL validation refuses a different owner and a foreign allow entry
  assert.throws(()=>validatePrivateAcl({...base,rules:[...base.rules,{sid:'S-1-1-0',type:'Allow',rights:1,inherited:false}]},true),/unsafe Windows permissions/);
 });
 
+test('Windows ACL inspection uses the system PowerShell when project cwd contains a fake executable',{skip:process.platform!=='win32'},()=>{
+ const dir=mkdtempSync(join(tmpdir(),'harnessy-private-cwd-')),previous=process.cwd();
+ try{
+  hardenPrivateDirectory(dir);
+  writeFileSync(join(dir,'powershell.exe'),'not an executable');
+  process.chdir(dir);
+  assert.equal(assertPrivateDirectory(dir).isDirectory(),true);
+ }finally{process.chdir(previous);rmSync(dir,{recursive:true,force:true})}
+});
+
 test('Windows 8.3 directory names are accepted while junctions are rejected',()=>{
  if(process.platform!=='win32')return;
  if(existsSync('C:\\PROGRA~1'))assert.doesNotThrow(()=>assertNoLinkComponents('C:\\PROGRA~1'));

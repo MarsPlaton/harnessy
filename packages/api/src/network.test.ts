@@ -11,6 +11,7 @@ import {keySlot} from '@harnessy/llm';
 import {fixture,call,FakeProvider,deferred} from './test-helpers.ts';
 import {MemoryKeys,config as apiConfig} from '../../llm/src/test-helpers.ts';
 const limits={timeout:15000},root='/api/network',proxy={id:'proxy-a',type:'proxy',label:'Прокси A',url:'socks5h://proxy.test:1080',login:'alice',expectedIp:'2001:db8::1'},direct={id:'direct',type:'direct',label:'Напрямую'};
+const unixTest=process.platform==='win32'?test.skip:test;
 async function setup(t:Parameters<typeof fixture>[0]){const keys=new MemoryKeys(),entries=builtinEntries({claude:new FakeProvider(),codex:new FakeProvider('codex')},{},{execute:async()=>({code:0,signal:null,stdout:'1.0.0',stderr:''})}),providerCatalog=new ProviderCatalog([...entries,...['ollama','gemini','custom-cli'].map(id=>({...entries[0]!,id,title:id}))]),h=await fixture(t,{deps:{networkKeys:keys,providerCatalog,llmKeys:new MemoryKeys()}});return {...h,keys,file:join(h.dir,'owner-settings.json')}}
 const save=(api:Awaited<ReturnType<typeof fixture>>['api'],config:unknown,revision:unknown=null,password?:string|null)=>call(api,root+'/exits/'+(config as any).id+'/save',{body:{config,revision,...(password!==undefined?{password}:{})}});
 
@@ -19,17 +20,18 @@ function sshHome(t:Parameters<typeof fixture>[0],dir:string){const home=join(dir
 test('22a: owner exits and ordered chains cover programs, API routes and Ollama; no implicit direct after configuration',limits,async t=>{
  const h=await setup(t);sshHome(t,h.dir);let r=await call(h.api,root+'/providers/claude');assert.equal(r.status,200);assert.deepEqual(r.body,{ok:true,provider:'claude',configured:false,exits:[],policy:{mode:'fallback',silenceSeconds:60},revision:null});
  const a=await save(h.api,proxy,null,'p'),d=await save(h.api,direct);assert.equal(a.status,200);assert.equal(d.status,200);assert.equal(a.body.password.mask,'••••••••');assert.equal(await h.keys.resolveKey(keySlot(proxy.id,a.body.config.passwordGeneration)),'p');
- assert.equal((await save(h.api,{id:'ssh',type:'ssh',label:'VPS',host:'vps.example.test',port:22,user:'owner',keyPath:'~/.ssh/id_ed25519'})).status,200);
+ if(process.platform!=='win32')assert.equal((await save(h.api,{id:'ssh',type:'ssh',label:'VPS',host:'vps.example.test',port:22,user:'owner',keyPath:'~/.ssh/id_ed25519'})).status,200);
  await h.runtime.settings.changeLlmProvider('custom',apiConfig('https://model.example.test'),null);
- for(const provider of ['claude','codex','ollama','gemini','custom-cli','api:custom']){r=await call(h.api,root+'/providers/'+provider,{body:{exits:['proxy-a','ssh','direct'],revision:null}});assert.equal(r.status,200);assert.deepEqual(r.body.exits,['proxy-a','ssh','direct']);assert.equal(r.body.configured,true)}
+ const routes=process.platform==='win32'?['proxy-a','direct']:['proxy-a','ssh','direct'];
+ for(const provider of ['claude','codex','ollama','gemini','custom-cli','api:custom']){r=await call(h.api,root+'/providers/'+provider,{body:{exits:routes,revision:null}});assert.equal(r.status,200);assert.deepEqual(r.body.exits,routes);assert.equal(r.body.configured,true)}
  r=await call(h.api,root+'/exits/proxy-a/delete',{body:{revision:a.body.revision}});assert.equal(r.body.code,'exit_in_use');
  let chain=(await call(h.api,root+'/providers/claude')).body;assert.equal((await call(h.api,root+'/providers/claude',{body:{exits:[],revision:chain.revision}})).status,200);
  chain=(await call(h.api,root+'/providers/claude')).body;assert.deepEqual(chain.exits,[]);assert.equal(chain.configured,true);assert.notEqual(chain.revision,null);
- const settings=new Settings(h.file);assert.deepEqual(settings.network().chains.claude,[]);assert.deepEqual((await call(h.api,root+'/exits')).body.exits.map((x:any)=>x.config.id),['proxy-a','direct','ssh']);
+ const settings=new Settings(h.file);assert.deepEqual(settings.network().chains.claude,[]);assert.deepEqual((await call(h.api,root+'/exits')).body.exits.map((x:any)=>x.config.id),routes);
  assert.equal((await call(h.api,root+'/providers/not-registered',{body:{exits:[],revision:null}})).body.code,'provider_unknown');assert.equal((await call(h.api,root+'/providers/api:missing')).body.code,'provider_unknown');
 });
 
-test('22b/r3: saving an SSH exit rejects a writable root and uses the same root check as tunnel startup',limits,async t=>{
+unixTest('22b/r3: saving an SSH exit rejects a writable root and uses the same root check as tunnel startup',limits,async t=>{
  const h=await setup(t),home=sshHome(t,h.dir),directory=join(home,'.ssh'),config={id:'ssh',type:'ssh',label:'VPS',host:'vps.example.test',port:22,user:'owner',keyPath:'~/.ssh/id_ed25519'};
  for(const mode of [0o777,0o775,0o702]){fs.chmodSync(directory,mode);const r=await save(h.api,config);assert.equal(r.status,400);assert.equal(r.body.code,'ssh_key_invalid');assert.equal(h.runtime.settings.network().exits.ssh,undefined)}
  fs.chmodSync(directory,0o755);assert.equal((await save(h.api,config)).status,200);
@@ -135,7 +137,7 @@ test('22a r2: queued chain update cannot resurrect a deleted route; malformed ne
  const failed=await call(h.api,'/api/llm/providers/race/delete',{body:{revision:route.revision}});assert.equal(failed.body.code,'network_unreadable');assert.equal(readFileSync(h.file,'utf8'),bytes);
 });
 
-test('22a r2: SSH save validates real file containment, including symlink ancestors, missing files and replacement',limits,async t=>{
+unixTest('22a r2: SSH save validates real file containment, including symlink ancestors, missing files and replacement',limits,async t=>{
  const h=await setup(t),home=sshHome(t,h.dir),base=join(home,'.ssh'),outside=join(h.dir,'outside');mkdirSync(outside);writeFileSync(join(outside,'key'),'OUTSIDE FAKE KEY');
  const ssh={id:'ssh',type:'ssh',label:'VPS',host:'vps.example.test',port:22,user:'owner',keyPath:'~/.ssh/id_ed25519'};
  symlinkSync(join(outside,'key'),join(base,'escape'));symlinkSync(outside,join(base,'escape-dir'));symlinkSync(join(base,'id_ed25519'),join(base,'inside'));

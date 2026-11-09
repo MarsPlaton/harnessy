@@ -10,6 +10,7 @@ import {MemoryKeys} from '../../llm/src/test-helpers.ts';
 import {networkUi as ui} from './network-ui-test-helpers.ts';
 import {sshDouble} from '../../runtime/src/ssh-test-helpers.ts';
 const opts={timeout:15000},root='/api/network';
+const unixTest=process.platform==='win32'?test.skip:test;
 const proxy={id:'fixture-proxy',type:'proxy',label:'Прокси',url:'socks5h://proxy.test:1080',login:'alice'};
 const ssh={id:'fixture-vps',type:'ssh',label:'VPS',host:'vps.test',port:2222,user:'owner',keyPath:'~/.ssh/id_ed25519'};
 const measured={ok:true,revision:'check',checkedAt:100,ip:'192.0.2.5',country:'Нидерланды',durationMs:48,state:'checked'};
@@ -43,7 +44,7 @@ test('23b: preview abort stops temporary SSH and cancels curl',opts,async t=>{
 });
 test('23b: malformed requests and model identities cannot use the preview or assign a provider',opts,async t=>{
  let calls=0;const h=await fixture(t,{deps:{networkKeys:new MemoryKeys(),networkCheckOptions:{execute:async()=>{calls++;throw Error()}}}});
- for(const body of [{},{config:proxy,password:null},{config:{...proxy,passwordRef:'other',passwordGeneration:'bogus'}},{config:{...proxy,url:'http://name:secret@proxy.test'}},{config:{...ssh,host:'-oProxyCommand=x'}},{config:{...ssh,keyPath:'/tmp/key'}},{config:{...proxy,type:'direct'}},{config:proxy,unexpected:true}])assert.ok((await call(h.api,root+'/preview',{body})).status>=400);
+ for(const body of [{},{config:proxy,password:null},{config:{...proxy,passwordRef:'other',passwordGeneration:'bogus'}},{config:{...proxy,url:'http://name:secret@proxy.test'}},{config:{...ssh,host:'-oProxyCommand=x'}},{config:{...ssh,keyPath:'/tmp/key'}},{config:{...proxy,type:'direct'}},{config:proxy,unexpected:true}]){const response=await call(h.api,root+'/preview',{body});assert.ok(response.status>=400,JSON.stringify({body,status:response.status,result:response.body}))}
  for(const headers of [{'x-pane-token':'fake'},{'x-harness-pane':'worker'}])assert.equal((await call(h.api,root+'/preview',{headers,body:{config:proxy}})).status,403);
  for(const use of [{},{provider:'absent',revision:null},{provider:'claude',revision:null,extra:true}])assert.ok((await call(h.api,root+'/exits/'+proxy.id+'/save',{body:{config:proxy,revision:null,use}})).status>=400);
  assert.equal(calls,0);assert.equal(h.runtime.settings.network().exits[proxy.id],undefined);
@@ -81,7 +82,7 @@ test('23b: shared API keeps ordinary GET unchanged and forwards the optional abo
 });
 
 
-for(const path of ['preview','saved-check'])test('23b r2: '+path+' uses real SSH configuration validation and removes the temporary key and process',opts,async t=>{
+for(const path of ['preview','saved-check'])unixTest('23b r2: '+path+' uses real SSH configuration validation and removes the temporary key and process',opts,async t=>{
  const f=sshDouble(t),h=await fixture(t,{deps:{sshTunnels:f.tunnels,networkCheckOptions:{execute:async spec=>output(spec.input!)}}});
  const config={...f.config,id:'vps',type:'ssh' as const,label:'VPS',keyPath:'~/.ssh/key'};
  let r;if(path==='preview')r=await call(h.api,root+'/preview',{body:{config}});else{
@@ -91,13 +92,13 @@ for(const path of ['preview','saved-check'])test('23b r2: '+path+' uses real SSH
  }
  assert.equal(r.status,200,r.text);assert.equal(r.body.check.ok,true);assert.equal(f.workers.length,1);assert.deepEqual(f.tunnels.snapshots(),[]);assert.equal(existsSync(f.workers[0]!.command.cwd),false);assert.equal(await f.workers[0]!.process.done.then(x=>x.code),0);
 });
-for(const fail of ['ssh','curl'])test('23b r2: real SSH manager is stopped and cleaned after '+fail+' failure',opts,async t=>{
+for(const fail of ['ssh','curl'])unixTest('23b r2: real SSH manager is stopped and cleaned after '+fail+' failure',opts,async t=>{
  const f=sshDouble(t);if(fail==='ssh')f.setExit({code:255,stderr:'Permission denied (publickey).'});
  const h=await fixture(t,{deps:{sshTunnels:f.tunnels,networkCheckOptions:{execute:async()=>({code:7,signal:null,stdout:'',stderr:'Connection failed'})}}});
  const r=await call(h.api,root+'/preview',{body:{config:{...f.config,id:'vps',type:'ssh',label:'VPS',keyPath:'~/.ssh/key'}}});
  assert.equal(r.status,200,r.text);assert.equal(r.body.check.ok,false);assert.equal(r.body.check.code,fail==='ssh'?'ssh_auth_failed':'network_check_failed');assert.deepEqual(f.tunnels.snapshots(),[]);assert.equal(f.workers.length,1);assert.equal(existsSync(f.workers[0]!.command.cwd),false);f.clock.advance(60000);assert.equal(f.workers.length,1);
 });
-for(const phase of ['startup','curl'])test('23b r2: HTTP abort releases the real SSH manager during '+phase,opts,async t=>{
+for(const phase of ['startup','curl'])unixTest('23b r2: HTTP abort releases the real SSH manager during '+phase,opts,async t=>{
  const f=sshDouble(t),started=deferred(),cleaned=deferred();if(phase==='startup')f.holdControl(true);
  const stop=f.tunnels.stop.bind(f.tunnels);f.tunnels.stop=async id=>{await stop(id);cleaned.resolve()};
  const h=await fixture(t,{deps:{sshTunnels:f.tunnels,networkCheckOptions:{execute:async(_spec,signal)=>{started.resolve();await new Promise<void>(resolve=>{if(signal.aborted)resolve();else signal.addEventListener('abort',()=>resolve(),{once:true})});return {code:1,signal:null,stdout:'',stderr:''}}}}});

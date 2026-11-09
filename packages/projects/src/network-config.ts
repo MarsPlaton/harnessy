@@ -3,7 +3,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {realpathSync,statSync} from 'node:fs';
 import {isIP} from 'node:net';
 import {homedir} from 'node:os';
-import {resolve,relative,isAbsolute,join} from 'node:path';
+import {resolve,relative,isAbsolute,join,sep} from 'node:path';
 import {validRoute,validGeneration} from '@harnessy/llm';
 import {object} from './files.ts';
 import {ProjectError} from './errors.ts';
@@ -43,7 +43,7 @@ export function validateSshKey(exit:NetworkExit){
  try{
   const home=homedir(),{path:base}=trustedSshDirectory(home),expected=join(realpathSync(home),'.ssh');
   const path=realpathSync(exit.keyPath.startsWith('~/.ssh/')?join(home,exit.keyPath.slice(2)):exit.keyPath),rel=relative(base,path);
-  if(base!==expected||!rel||rel==='..'||rel.startsWith('../')||isAbsolute(rel)||!statSync(path).isFile())throw Error();
+  if(base!==expected||!rel||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel)||!statSync(path).isFile())throw Error();
  }catch{throw new ProjectError('ssh_key_invalid','SSH: нужен существующий файл ключа внутри ~/.ssh; ссылка наружу недопустима')}
 }
 export function validateExit(raw:unknown):NetworkExit {
@@ -64,7 +64,7 @@ export function validateExit(raw:unknown):NetworkExit {
   if(typeof raw.host!=='string'||!(isIP(raw.host)||/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(raw.host))||!Number.isInteger(raw.port)||Number(raw.port)<1||Number(raw.port)>65535||typeof raw.user!=='string'||!/^[a-zA-Z_][a-zA-Z0-9_.-]{0,63}$/.test(raw.user))networkInvalid('SSH: нужны host, port (1–65535) и user');
   if(!text(raw.keyPath,1024))networkInvalid('SSH: нужен путь к ключу внутри ~/.ssh');
   const value=raw.keyPath as string,base=join(homedir(),'.ssh'),path=value.startsWith('~/.ssh/')?join(homedir(),value.slice(2)):value,rel=relative(base,resolve(path));
-  if(!isAbsolute(path)||!rel||rel==='..'||rel.startsWith('../')||isAbsolute(rel)||path.split('/').includes('..'))networkInvalid('SSH: нужен путь к ключу внутри ~/.ssh');
+  if(!isAbsolute(path)||!rel||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel)||path.split('/').includes('..'))networkInvalid('SSH: нужен путь к ключу внутри ~/.ssh');
  }else networkInvalid('Тип выхода: direct, proxy или ssh');
  return structuredClone(raw) as NetworkExit;
 }

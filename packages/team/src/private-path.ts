@@ -14,7 +14,8 @@ function descriptor(path:string,script=inspectScript):Descriptor {
  const env={...process.env};
  for(const key of Object.keys(env))if(key.toLowerCase()==='psmodulepath')delete env[key];
  const windowsModules=join(process.env.WINDIR??'C:\\Windows','System32','WindowsPowerShell','v1.0','Modules');
- const output=execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{
+ const powershell=join(process.env.WINDIR??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
+ const output=execFileSync(powershell,['-NoProfile','-NonInteractive','-Command',script],{
   env:{...env,PSModulePath:windowsModules,HARNESSY_ACL_PATH:path},encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:1024*1024
  });
  const value=JSON.parse(output) as Descriptor;
