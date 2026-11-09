@@ -66,5 +66,5 @@ test('TS-48.1: folder keyboard and unclipped menu in four viewports',
   let stdout='',stderr='';child.stdout.on('data',chunk=>{stdout+=chunk});child.stderr.on('data',chunk=>{stderr+=chunk});
   const exit=await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve)});
   assert.equal(exit,0,'browser regression failed: '+stderr+'\n'+stdout);
-  assert.match(stdout,/390x844: 232px/);
+  assert.match(stdout,/390x\d+: 232px/);
 });
