@@ -7,6 +7,7 @@ import {LoginTerminal} from './login-terminal.ts';
 import {executeCli} from './cli/process.ts';
 import {cliFixture} from './cli/test-support.ts';
 import {ProviderError} from './types.ts';
+import {CatalogCache} from './catalog-cache.ts';
 
 test('268: CLI descriptor exposes public metadata; unavailable/malformed source is explicit, never a fake login',async t=>{
  const f=await cliFixture(t),entry=cliEntry(f.description,{env:f.env,cwd:f.dir,temporaryDirectory:f.dir}),catalog=new ProviderCatalog([entry]);t.after(()=>catalog.close());const {row}=await catalog.read(entry.id);assert.equal(row.installed,true);assert.equal(row.login.account,'f•••@example.test');assert.equal(row.models[0]!.id,'test-model');assert.equal(JSON.stringify(row).includes('secret'),false);assert.equal(f.capture().some(v=>v.action==='turn'||v.action==='login'),false);
@@ -31,7 +32,8 @@ test('268: existing Claude/Codex metadata use their provider ports without chang
 
 test('24a: a safe image capability survives the public catalog disk snapshot',async t=>{
  const f=await cliFixture(t),cache=join(realpathSync(f.dir),'catalog-cache'),base=cliEntry(f.description,{env:f.env,cwd:f.dir,temporaryDirectory:f.dir}),entry={...base,models:async()=>[{id:'vision-model',label:'Vision model',images:true}]};
- const first=new ProviderCatalog([entry],()=>1791500000125,{cacheDir:cache});assert.equal((await first.read(entry.id)).row.capabilities.images,true);await first.close();
+ const first=new ProviderCatalog([entry],()=>1791500000125,{cacheDir:cache});const observed=(await first.read(entry.id)).row;assert.equal(observed.capabilities.images,true);await first.close();
+ if(!existsSync(join(cache,entry.id+'.json'))){new CatalogCache(cache,()=>1791500000125).save(observed);assert.fail('automatic catalog save did not produce its snapshot')}
  const saved=JSON.parse(readFileSync(join(cache,entry.id+'.json'),'utf8'));assert.equal(saved.models[0]?.images,true);
  const restored=new ProviderCatalog([entry],()=>1791500001125,{cacheDir:cache});t.after(()=>restored.close());assert.equal(restored.peek(entry.id).models[0]?.images,true);assert.equal(restored.peek(entry.id).capabilities.images,true);
 });

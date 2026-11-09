@@ -1,5 +1,5 @@
 import {readFileSync,mkdirSync,openSync,fsyncSync,closeSync,renameSync,statSync} from 'node:fs';
-import {dirname,join} from 'node:path';
+import {dirname,isAbsolute,join,relative,sep} from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
 import {atomicWrite} from '@harnessy/team';
 import {isConversationMessage} from '@harnessy/context';
@@ -33,7 +33,7 @@ export function numberTranscript(holder:{transcript:TranscriptMessage[];transcri
 // Only paths named by write/edit tools become saved attachments; reads and arbitrary tool text do not.
 export function artifactPaths(event:{name?:unknown;detail?:unknown},project:string):string[]{
  if(typeof event.name!=='string'||!/^(?:Write|Edit|MultiEdit|apply_patch|.*[._](?:write_file|edit_file))$/i.test(event.name)||typeof event.detail!=='string')return [];
- return [...new Set(event.detail.split(', ').map(path=>path.startsWith(project+'/')?path.slice(project.length+1):path.startsWith('./')?path.slice(2):path).filter(path=>path.length<=4096&&!/[\x00-\x1f\x7f\\]/.test(path)&&/^(artifacts|docs)\//.test(path)&&!path.split('/').some(x=>!x||x==='.'||x==='..')&&/\.[a-z\d]{1,12}$/i.test(path)))].slice(0,50);
+ return [...new Set(event.detail.split(', ').map(path=>isAbsolute(path)?relative(project,path).split(sep).join('/'):path.startsWith(project+'/')?path.slice(project.length+1):path.startsWith('./')?path.slice(2):path).filter(path=>path.length<=4096&&!/[\x00-\x1f\x7f\\]/.test(path)&&/^(artifacts|docs)\//.test(path)&&!path.split('/').some(x=>!x||x==='.'||x==='..')&&/\.[a-z\d]{1,12}$/i.test(path)))].slice(0,50);
 }
 export interface AnalyticalTurn {turnInstanceId:string;ts:number;model:string;vendor?:string|null;outcome:'error';errorCode:string;partialText?:string;recordSeqs?:number[];failure?:import('./turn-failure.ts').TurnFailure;usage?:import('@harnessy/providers').Usage;usageIncomplete?:true;durationMs?:number;toolEvents?:ObservedToolEvent[];toolResults?:ToolReceipt[]}
 export interface ResultMessage extends TranscriptMessage {role:'ai';deliverySeq:number;runtime:Receipt}

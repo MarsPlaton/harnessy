@@ -70,7 +70,7 @@ test('21b HTTP: API room and persisted team use the same route; malformed owner 
  writeFileSync(join(h.dir,'owner-settings.json'),'{broken');const status=await call(h.api,'/api/status');assert.equal(status.status,200,status.text);assert.equal(status.body.apiError.code,'settings_unreadable');assert.equal(status.body.network,null);assert.equal(status.body.networkError.code,'network_unreadable');assert.ok(status.body.models.claude.length);assert.equal(readFileSync(join(h.dir,'owner-settings.json'),'utf8'),'{broken');
 });
 
-test('21b HTTP: all mode runs a bounded shell tool in the project through its owner binding',async t=>{
+test('21b HTTP: all mode runs a bounded shell tool in the project through its owner binding',{skip:process.platform==='win32'?'Windows pilot has no confined API-agent shell':false},async t=>{
  let step=0;const server=await endpoint(t,(_b,_q,res)=>answer(res,step++===0?{name:'shell',arguments:{command:'pwd; printf API_SHELL',timeout_ms:3000}}:'shell done')),h=await fixture(t,{deps:{llmKeys:new MemoryKeys()}});await connect(h,server.url,'read');
  const changed=await call(h.api,'/api/panes/worker',{body:{mode:'all',binding:h.runtime.paneBinding('worker')}});assert.equal(changed.status,200,changed.text);await h.runtime.runTurn('worker','shell');assert.match(JSON.stringify(server.bodies[1].messages),/API_SHELL/);assert.ok(JSON.stringify(server.bodies[1].messages).includes(h.dir));assert.equal(h.codex.calls.length,0);
 });
