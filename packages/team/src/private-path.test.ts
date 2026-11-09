@@ -26,8 +26,10 @@ test('private storage rejects inherited Windows access and protects a directory 
 
 test('Windows ACL validation refuses a different owner and a foreign allow entry',()=>{
  const sid='S-1-5-21-100-200-300-1001';
- const base={current:sid,owner:sid,protected:true,rules:[{sid,type:'Allow',rights:2032127,inherited:false}]};
+ const base={current:sid,owner:sid,admin:false,protected:true,rules:[{sid,type:'Allow',rights:2032127,inherited:false}]};
  assert.doesNotThrow(()=>validatePrivateAcl(base,true));
+ assert.doesNotThrow(()=>validatePrivateAcl({...base,owner:'S-1-5-32-544',admin:true},true));
+ assert.throws(()=>validatePrivateAcl({...base,owner:'S-1-5-32-544'},true),/unsafe Windows permissions/);
  assert.throws(()=>validatePrivateAcl({...base,owner:'S-1-5-21-100-200-300-1002'},true),/unsafe Windows permissions/);
  assert.throws(()=>validatePrivateAcl({...base,rules:[...base.rules,{sid:'S-1-1-0',type:'Allow',rights:1,inherited:false}]},true),/unsafe Windows permissions/);
 });

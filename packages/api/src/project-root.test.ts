@@ -9,7 +9,7 @@ const error={ok:false,code:'path_is_root',error:'это папка всех пр
 function snapshot(path:string):Record<string,string>{const out:Record<string,string>={};for(const name of readdirSync(path,{withFileTypes:true})){if(name.isDirectory())for(const [p,bytes] of Object.entries(snapshot(join(path,name.name))))out[name.name+'/'+p]=bytes;else if(name.isFile())out[name.name]=readFileSync(join(path,name.name)).toString('base64')}return out}
 
 for(const route of ['/api/project','/api/project/create','/api/room/move'])for(const alias of ['literal','symlink','equivalent'])test('118/127: '+route+' refuses '+alias+' projects root before writes or closing',async t=>{
- const h=await fixture(t),root=join(h.dir,'project-folders'),link=join(h.dir,'alias');mkdirSync(root);mkdirSync(join(root,'child'));writeFileSync(join(root,'keep'),'исходные байты');symlinkSync(root,link);
+ const h=await fixture(t),root=join(h.dir,'project-folders'),link=join(h.dir,'alias');mkdirSync(root);mkdirSync(join(root,'child'));writeFileSync(join(root,'keep'),'исходные байты');symlinkSync(root,link,process.platform==='win32'?'junction':'dir');
  await h.runtime.settingsPatch('owner',{projectsRoot:root},OWNER);h.runtime.roomSet({model:'w1'},OWNER);const original=h.runtime.project,before=snapshot(root);
  const path=alias==='literal'?root:alias==='symlink'?link:root+'/child/.././';
  const response=await call(h.api,route,{body:{path,create:true,git:true,model:'w1'}});
@@ -25,7 +25,7 @@ for(const route of ['/api/project','/api/project/create','/api/room/move'])for(c
  const entered=deferred(),release=deferred(),close=h.provider.close.bind(h.provider);let once=true;t.after(()=>release.resolve());
  h.provider.close=async()=>{if(once){once=false;entered.resolve();await release.promise}return close()};
  const opening=call(h.api,route,{body:{path:target,create:true,git:false,model:'w1'}});await entered.promise;
- renameSync(target,target+'-original');symlinkSync(root,target);release.resolve();const response=await opening;
+ renameSync(target,target+'-original');symlinkSync(root,target,process.platform==='win32'?'junction':'dir');release.resolve();const response=await opening;
  assert.equal(response.status,400);assert.deepEqual(response.body,error);assert.deepEqual(snapshot(root),before);assert.equal(existsSync(join(root,'.harness')),false);assert.equal(h.provider.calls.length,0);
  assert.equal(h.runtime.project.dir,h.dir);assert.equal(h.runtime.project.closed,false);assert.equal(h.runtime.registry.get('room')!.model,'w1');
  if(scope==='project')assert.equal(h.runtime.settings.effective().projectsRoot,root);
@@ -43,7 +43,7 @@ test('118/127: missing root cannot be materialized; child projects and root navi
 });
 
 test('118/127: direct open rejects realpath root while the active turn remains alive',async t=>{
- const h=await fixture(t),root=join(h.dir,'project-folders'),link=join(h.dir,'alias'),gate=deferred(),started=deferred();mkdirSync(root);symlinkSync(root,link);await h.runtime.settingsPatch('owner',{projectsRoot:link},OWNER);
+ const h=await fixture(t),root=join(h.dir,'project-folders'),link=join(h.dir,'alias'),gate=deferred(),started=deferred();mkdirSync(root);symlinkSync(root,link,process.platform==='win32'?'junction':'dir');await h.runtime.settingsPatch('owner',{projectsRoot:link},OWNER);
  h.provider.onRun=async(_seat,_text,ctx)=>{ctx.modelStarted?.();started.resolve();await gate.promise;return {text:'готово',sessionId:null}};t.after(()=>gate.resolve());
  const original=h.runtime.project,turn=h.runtime.runTurn('worker','продолжай');await started.promise;
  await assert.rejects(h.runtime.openProject(root),e=>e instanceof RuntimeError&&e.code==='path_is_root'&&e.status===400);
