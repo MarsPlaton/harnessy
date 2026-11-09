@@ -1,0 +1,59 @@
+import { createHash } from 'node:crypto';
+import { createReadStream, existsSync, readFileSync, renameSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createWriteStream } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const packageDir = dirname(fileURLToPath(import.meta.url));
+const electronDir = join(packageDir, 'node_modules', 'electron');
+const { version } = JSON.parse(readFileSync(join(electronDir, 'package.json'), 'utf8'));
+const platform = process.platform;
+const arch = process.arch;
+const archive = `electron-v${version}-${platform}-${arch}.zip`;
+const checksums = JSON.parse(readFileSync(join(electronDir, 'checksums.json'), 'utf8'));
+const expectedHash = checksums[archive];
+const executable = platform === 'win32' ? 'electron.exe' : platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron' : null;
+const token = process.env.GH_TOKEN;
+
+if (!executable || !expectedHash || !token) {
+  throw new Error(`Official Electron API fallback needs a supported archive and GH_TOKEN (${archive})`);
+}
+
+const apiHeaders = {
+  Authorization: `Bearer ${token}`,
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+  'User-Agent': 'harnessy-electron-ci',
+};
+const releaseResponse = await fetch(`https://api.github.com/repos/electron/electron/releases/tags/v${version}`, { headers: apiHeaders });
+if (!releaseResponse.ok) throw new Error(`Electron release API returned ${releaseResponse.status}`);
+const release = await releaseResponse.json();
+const asset = release.assets.find((entry) => entry.name === archive);
+if (!asset || asset.digest !== `sha256:${expectedHash}`) {
+  throw new Error(`Electron asset or SHA-256 metadata mismatch for ${archive}`);
+}
+
+const assetResponse = await fetch(asset.url, {
+  headers: { ...apiHeaders, Accept: 'application/octet-stream' },
+});
+if (!assetResponse.ok || !assetResponse.body) throw new Error(`Electron asset API returned ${assetResponse.status}`);
+const archivePath = join(process.env.RUNNER_TEMP || tmpdir(), archive);
+await pipeline(Readable.fromWeb(assetResponse.body), createWriteStream(archivePath));
+
+const hash = createHash('sha256');
+for await (const chunk of createReadStream(archivePath)) hash.update(chunk);
+if (hash.digest('hex') !== expectedHash) throw new Error(`Electron archive SHA-256 mismatch for ${archive}`);
+
+const { extract } = await import('@electron-internal/extract-zip');
+const distDir = join(electronDir, 'dist');
+await mkdir(distDir, { recursive: true });
+await extract(archivePath, { dir: distDir });
+const typeDefinition = join(distDir, 'electron.d.ts');
+if (existsSync(typeDefinition)) renameSync(typeDefinition, join(electronDir, 'electron.d.ts'));
+await writeFile(join(electronDir, 'path.txt'), executable);
+if (!existsSync(join(distDir, executable))) throw new Error(`Electron executable is missing after extraction: ${archive}`);
+console.log(`Installed verified official Electron ${version} via GitHub API (${archive})`);

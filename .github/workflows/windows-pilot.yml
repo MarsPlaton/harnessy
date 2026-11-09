@@ -34,6 +34,8 @@ jobs:
       - name: Install desktop dependencies
         run: npm --prefix ui/desktop ci --no-audit --no-fund
       - name: Verify desktop test binary
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $installed = $false
@@ -42,7 +44,10 @@ jobs:
             if ($LASTEXITCODE -eq 0) { $installed = $true; break }
             if ($attempt -lt 5) { Start-Sleep -Seconds (10 * $attempt) }
           }
-          if (-not $installed) { throw 'Electron download failed after five attempts' }
+          if (-not $installed) {
+            node ui/desktop/install-electron-from-github-api.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Verified Electron API download failed' }
+          }
           node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
       - name: Build TypeScript packages
         run: npm run build
@@ -135,10 +140,15 @@ jobs:
       - name: Install desktop dependencies
         run: npm --prefix ui/desktop ci --no-audit --no-fund
       - name: Verify desktop test binary
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           for attempt in 1 2 3 4 5; do
             if node ui/desktop/node_modules/electron/install.js; then break; fi
-            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            if [ "$attempt" -eq 5 ]; then
+              node ui/desktop/install-electron-from-github-api.mjs
+              break
+            fi
             sleep $((10 * attempt))
           done
           node -e "const p=require('./ui/desktop/node_modules/electron');const r=require('node:child_process').spawnSync(p,['--version'],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||r.stdout||'Electron did not start')"
