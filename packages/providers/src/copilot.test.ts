@@ -37,8 +37,8 @@ test('281/282: state cleanup is journaled, preserves neighbours, refuses travers
  if(process.platform==='win32')assert.equal(assertPrivateDirectory(a.path).isDirectory(),true);else assert.equal(statSync(a.path).mode&0o777,0o700);assert.throws(()=>store.acquire(h.dir,'worker'),{code:'busy'});await assert.rejects(store.remove(h.dir,undefined,()=>{}),{code:'busy'});a.release();b.release();
  await assert.rejects(store.remove(h.dir,'../outside',()=>{}),{code:'protocol'});await assert.rejects(store.remove(h.dir,'worker',()=>{throw Error('journal failed')}));assert.ok(existsSync(a.path));
  const journal:any[]=[];await store.remove(h.dir,'worker',e=>{journal.push(e)});assert.equal(existsSync(a.path),false);assert.equal(readFileSync(join(b.path,'session'),'utf8'),'reviewer');assert.equal(journal[0].kind,'provider.state.remove');
- symlinkSync(h.dir,a.path);await assert.rejects(store.remove(h.dir,'worker',()=>{}),{code:'protocol'});assert.ok(existsSync(h.account));
- const root=join(h.stateRoot,'copilot');renameSync(root,root+'-saved');symlinkSync(h.dir,root);await assert.rejects(store.remove(h.dir,'reviewer',()=>{}),{code:'protocol'});assert.ok(existsSync(h.account));
+ symlinkSync(h.dir,a.path,process.platform==='win32'?'junction':'dir');await assert.rejects(store.remove(h.dir,'worker',()=>{}),{code:'protocol'});assert.ok(existsSync(h.account));
+ const root=join(h.stateRoot,'copilot');renameSync(root,root+'-saved');symlinkSync(h.dir,root,process.platform==='win32'?'junction':'dir');await assert.rejects(store.remove(h.dir,'reviewer',()=>{}),{code:'protocol'});assert.ok(existsSync(h.account));
 });
 test('282: cleanup holds exclusion across the journal await',async t=>{
  const h=await copilotFixture(t),store=new CliStateStore('copilot',h.stateRoot),a=store.acquire(h.dir,'worker');a.release();let resume!:()=>void;const waiting=new Promise<void>(r=>resume=r),job=store.remove(h.dir,'worker',()=>waiting);
@@ -57,6 +57,6 @@ test('281/282: process-owned lease excludes a second engine and recovers after a
 
 test('307: replacement during beforeModel is rejected by the final object check',async t=>{
  const h=await copilotFixture(t),store=new CliStateStore('copilot',h.stateRoot),lease=store.acquire(h.dir,h.seat.id),outside=join(h.dir,'outside');lease.release();mkdirSync(outside);writeFileSync(join(outside,'keep'),'safe');
- await assert.rejects(h.provider.runTurn(h.seat,'no turn',{...h.ctx,beforeModel:async()=>{renameSync(lease.path,lease.path+'-saved');symlinkSync(outside,lease.path)}}),{code:'state_dir_tampered'});
+ await assert.rejects(h.provider.runTurn(h.seat,'no turn',{...h.ctx,beforeModel:async()=>{renameSync(lease.path,lease.path+'-saved');symlinkSync(outside,lease.path,process.platform==='win32'?'junction':'dir')}}),{code:'state_dir_tampered'});
  assert.equal(h.capture().some(c=>c.turn),false);assert.deepEqual(readdirSync(outside),['keep']);assert.equal(readFileSync(join(outside,'keep'),'utf8'),'safe');
 });
