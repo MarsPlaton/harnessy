@@ -5,7 +5,6 @@ import {OWNER,string} from './routes.ts';
 import {json,slice,text} from './responses.ts';
 import {providerOwner} from './routes-providers.ts';
 const roles={role_taken:409,seat_exists:409};
-const windowsAutopilot=()=>new RuntimeError('autopilot_unsupported','Автопилот пока недоступен на Windows: журнал решений требует защищённого хранения',409);
 export function ownerRoutes(r:Runtime):Route[]{return [
  {method:'POST',path:'/api/project',handle:async({body})=>json(await r.projectSet(string(body.path),{reload:pyTruthy(body.reload)},OWNER))},
  {method:'POST',path:'/api/project/create',handle:async({body})=>json(await r.projectCreate(body,OWNER))},
@@ -23,9 +22,9 @@ export function ownerRoutes(r:Runtime):Route[]{return [
  {method:'POST',path:'/api/settings',handle:async({request,body})=>{providerOwner(request);return json(await r.settingsPatch(body.scope,body.patch,OWNER))}},
  {method:'POST',path:'/api/tasks',style:'J',handle:async({request,body})=>{providerOwner(request);return json(await r.taskChange('create',body,OWNER),201)}},
  {method:'POST',path:'/api/tasks/:id/assign',style:'J',handle:async({request,body,params})=>{providerOwner(request);return json(await r.taskChange('assign',body,OWNER,params.id!))}},
- {method:'POST',path:'/api/autopilot',style:'J',handle:async({request,body})=>{providerOwner(request);if(process.platform==='win32'&&body.on!==false)throw windowsAutopilot();return json(await r.autopilotSet(body,OWNER))}},
- {method:'GET',path:'/api/autopilot/decisions',style:'J',handle:({request})=>{providerOwner(request);if(process.platform==='win32')return json({ok:true,project:r.project.dir,decisions:[],lastFailure:null,available:false,reason:windowsAutopilot().message});return json(r.autopilotDecisions(OWNER))}},
- {method:'POST',path:'/api/autopilot/decisions/:id/cancel',style:'J',handle:async({request,body,params})=>{providerOwner(request);if(process.platform==='win32')throw windowsAutopilot();if(Object.keys(body).some(key=>!['project','effectVersion'].includes(key))||typeof body.project!=='string'||typeof body.effectVersion!=='string'||!body.effectVersion)throw new RuntimeError('decision_invalid','Нужны проект и версия применённого эффекта',400);return json(await r.autopilotCancelDecision(body.project,params.id!,body.effectVersion,OWNER))}},
+ {method:'POST',path:'/api/autopilot',style:'J',handle:async({request,body})=>{providerOwner(request);return json(await r.autopilotSet(body,OWNER))}},
+ {method:'GET',path:'/api/autopilot/decisions',style:'J',handle:({request})=>{providerOwner(request);return json(r.autopilotDecisions(OWNER))}},
+ {method:'POST',path:'/api/autopilot/decisions/:id/cancel',style:'J',handle:async({request,body,params})=>{providerOwner(request);if(Object.keys(body).some(key=>!['project','effectVersion'].includes(key))||typeof body.project!=='string'||typeof body.effectVersion!=='string'||!body.effectVersion)throw new RuntimeError('decision_invalid','Нужны проект и версия применённого эффекта',400);return json(await r.autopilotCancelDecision(body.project,params.id!,body.effectVersion,OWNER))}},
  {method:'GET',path:'/api/context/:id',handle:({params})=>r.registry.get(params.id!)?json(r.context(params.id!)):json({ok:false,error:'нет такого места'},404)},
  {method:'POST',path:'/api/halt',handle:async({body})=>json(await r.halt(body.on===undefined||pyTruthy(body.on),OWNER))},
  {method:'POST',path:'/api/room',handle:async({body})=>json(await r.roomSet(body,OWNER))},

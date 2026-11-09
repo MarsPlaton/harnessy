@@ -1,7 +1,7 @@
 import {constants,closeSync,fstatSync,lstatSync,openSync,readFileSync,writeFileSync,renameSync,fsyncSync,realpathSync} from 'node:fs';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {withPathLock} from '@harnessy/team';
+import {assertPrivateFile,hardenPrivateDirectory,withPathLock} from '@harnessy/team';
 import {RuntimeError} from './errors.ts';
 import type {AutopilotBudgetPort,AutopilotBudgetCall} from './autopilot-council.ts';
 
@@ -15,12 +15,12 @@ export class AutopilotSpendBudget implements AutopilotBudgetPort {
  private readonly path:string;private project:string;private quotes:AutopilotSpendQuotes;
  constructor(project:string,quotes:AutopilotSpendQuotes){this.project=project;this.quotes=quotes;this.path=join(project,'.harness','state','autopilot-spend.json')}
  private read():Reservation[]{
-  const parent=join(this.project,'.harness','state');if(realpathSync(parent)!==parent||lstatSync(parent).uid!==process.getuid?.())throw invalid();
+  const parent=join(this.project,'.harness','state');if(process.platform==='win32'){try{hardenPrivateDirectory(parent)}catch{throw invalid()}}else if(realpathSync(parent)!==parent||lstatSync(parent).uid!==process.getuid?.())throw invalid();
   let fd:number|undefined;
-  try{const info=lstatSync(this.path);if(!info.isFile()||info.isSymbolicLink()||info.size>4*1024*1024||info.uid!==process.getuid?.()||(info.mode&0o077)!==0)throw invalid();fd=openSync(this.path,constants.O_RDONLY|constants.O_NOFOLLOW);const stat=fstatSync(fd);if(!stat.isFile()||stat.size>4*1024*1024)throw invalid();const data=JSON.parse(readFileSync(fd,'utf8'));if(!Array.isArray(data)||data.some(r=>!r||!Number.isSafeInteger(r.generation)||r.generation<1||typeof r.window!=='string'||!r.window||!percentage(r.baseline)||!Number.isFinite(r.amount)||r.amount<0||!Number.isSafeInteger(r.uses)||r.uses<0))throw invalid();return data}
+  try{const info=lstatSync(this.path);if(!info.isFile()||info.isSymbolicLink()||info.size>4*1024*1024||process.platform!=='win32'&&(info.uid!==process.getuid?.()||(info.mode&0o077)!==0))throw invalid();if(process.platform==='win32')try{assertPrivateFile(this.path)}catch{throw invalid()};fd=openSync(this.path,constants.O_RDONLY|constants.O_NOFOLLOW);const stat=fstatSync(fd);if(!stat.isFile()||stat.size>4*1024*1024)throw invalid();if(process.platform==='win32')try{const current=assertPrivateFile(this.path);if(current.dev!==stat.dev||current.ino!==stat.ino)throw invalid()}catch{throw invalid()};const data=JSON.parse(readFileSync(fd,'utf8'));if(!Array.isArray(data)||data.some(r=>!r||!Number.isSafeInteger(r.generation)||r.generation<1||typeof r.window!=='string'||!r.window||!percentage(r.baseline)||!Number.isFinite(r.amount)||r.amount<0||!Number.isSafeInteger(r.uses)||r.uses<0))throw invalid();return data}
   catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return [];throw e}finally{if(fd!==undefined)closeSync(fd)}
  }
- private write(rows:Reservation[]){const tmp=this.path+'.'+randomUUID()+'.tmp';let fd:number|undefined;try{fd=openSync(tmp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);writeFileSync(fd,JSON.stringify(rows));fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(tmp,this.path)}finally{if(fd!==undefined)closeSync(fd)}}
+ private write(rows:Reservation[]){const tmp=this.path+'.'+randomUUID()+'.tmp';let fd:number|undefined;try{fd=openSync(tmp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);writeFileSync(fd,JSON.stringify(rows));fsyncSync(fd);if(process.platform==='win32')try{const stat=fstatSync(fd),pathStat=assertPrivateFile(tmp);if(stat.dev!==pathStat.dev||stat.ino!==pathStat.ino)throw invalid()}catch{throw invalid()};closeSync(fd);fd=undefined;renameSync(tmp,this.path)}finally{if(fd!==undefined)closeSync(fd)}}
  private async checked(calls:readonly AutopilotBudgetCall[]){const rows=await this.quotes(calls);if(rows.length!==calls.length||rows.some(q=>q.measured!==undefined&&typeof q.measured!=='boolean'||typeof q.window!=='string'||!q.window||!percentage(q.percentUsed)||!percentage(q.upperPercent)||q.upperPercent===0||typeof q.basis!=='string'||!q.basis.trim()))throw invalid();return rows}
  async reserve(input:Parameters<AutopilotBudgetPort['reserve']>[0]){
   if(input.project!==this.project||!input.calls.length||!Number.isSafeInteger(input.generation)||input.generation<1||!percentage(input.maxSpendPercent))throw invalid();

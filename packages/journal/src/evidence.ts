@@ -26,7 +26,7 @@ function realPath(path:string,links={count:0}):{path:string;missing:boolean} {
 export function resolveEvidence(projectRoot:string,path:unknown):string|null {
  if(typeof path!=='string'||!pythonTrim(path))return null;
  try{
- const root=realPath(projectRoot).path,raw=isAbsolute(path)?path:root+sep+path,target=realPath(raw),canonical=target.missing?target.path:realpathSync.native(raw),rel=relative(root,canonical);
+ const root=realPath(projectRoot).path,raw=isAbsolute(path)?path:root+sep+path,target=realPath(raw),canonical=target.path,rel=relative(root,canonical);
  if(rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel))return null;
  // A missing prefix followed by '..' must not make an existing, different file pass.
  return target.missing?raw:canonical

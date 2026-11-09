@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync,readFileSync,existsSync,readdirSync,symlinkSync,rmSync} from 'node:fs';
-import {join} from 'node:path';
+import {join,sep} from 'node:path';
 import {withPathLock} from '@harnessy/team';
 import {GitOps} from '@harnessy/projects';
 import {createRuntime,RuntimeError} from './index.ts';
@@ -15,14 +15,14 @@ test('154: promotion keeps chat identity, session and old receipts with provenan
  const out=await r.promoteChat(i.id,i.args,OWNER);await r.idle();assert.equal(out.chat.id,i.id);assert.equal(out.pane.id,'orchestrator');assert.equal(h.provider.calls.length,2);assert.equal(h.provider.calls[1]!.seat.sessionId,session);
  const chat=r.project.state.chats.chats[i.id]!;assert.deepEqual(chat.transcript.slice(0,original.length).map(({provenance,...m})=>m),original);assert.equal((chat.transcript[0]!.provenance as any).pane,'room');
  assert.equal(r.project.state.results(r.registry.get('orchestrator')!).length,1);assert.equal(r.journal.read({limit:0}).filter(x=>x.thread?.startsWith('promotion:')).length,2);
- assert.match(h.provider.calls[1]!.message,/исковое заявление/);assert.match(h.provider.calls[1]!.message,new RegExp(h.dir+'/.harness/MEMORY.md'));assert.match(h.provider.calls[1]!.message,/первое поручение/i);
+ assert.match(h.provider.calls[1]!.message,/исковое заявление/);assert.ok(h.provider.calls[1]!.message.includes(join(h.dir,'.harness','MEMORY.md')));assert.match(h.provider.calls[1]!.message,/первое поручение/i);
  const again=await r.promoteChat(i.id,i.args,OWNER);assert.equal(again.already,true);await r.idle();assert.equal(h.provider.calls.length,2);
  await r.close();const provider=new FakeProvider(),next=await createRuntime({...h.deps,providers:{claude:provider}},completedActions);t.after(()=>next.close());await next.idle();assert.equal(next.project.state.chats.active.orchestrator,i.id);assert.equal(next.registry.get('orchestrator')!.status,'idle');assert.equal(provider.calls.length,0);assert.equal((await next.promoteChat(i.id,i.args,OWNER)).already,true);
 });
 
 test('154/155: folder promotion keeps id, one carry, document references and new session',async t=>{
  const h=await harness(t),r=h.runtime,root=join(h.dir,'projects'),doc=join(h.dir,'case.txt');writeFileSync(doc,'private document body');await r.settingsPatch('owner',{projectsRoot:root},OWNER);r.roomSet({model:'w2',folder:false},OWNER);const room=r.registry.get('room')!;room.record('me','Хочу исковое заявление');room.record('ai','Обсудили ответчика');room.record('peer','удаляемая реплика');room.transcript.pop();room.sessionId='source-session';room.carry='ранние решения';const i=input(r,{documents:[{project:h.dir,path:'case.txt'}],createProject:false,task:'  Первое поручение  '});
- const out=await r.promoteChat(i.id,i.args,OWNER);await r.idle();assert.equal(out.chat.id,i.id);assert.equal(out.created,true);assert.ok(out.project.startsWith(root+'/'));assert.equal(existsSync(join(out.project,'.git')),true);assert.equal(existsSync(join(out.project,'case.txt')),false);
+ const out=await r.promoteChat(i.id,i.args,OWNER);await r.idle();assert.equal(out.chat.id,i.id);assert.equal(out.created,true);assert.ok(out.project.startsWith(root+sep));assert.equal(existsSync(join(out.project,'.git')),true);assert.equal(existsSync(join(out.project,'case.txt')),false);
  assert.equal(h.provider.calls.length,1);assert.equal(h.provider.calls[0]!.seat.sessionId,null);assert.equal(h.provider.calls[0]!.message.split('Владелец: Хочу исковое заявление').length-1,1);assert.match(h.provider.calls[0]!.message,/ранние решения/);assert.doesNotMatch(h.provider.calls[0]!.message,/private document body/);assert.deepEqual(out.chat.documents,[{project:h.dir,path:'case.txt'}]);
  await r.promoteChat(i.id,i.args,OWNER);await r.idle();assert.equal(h.provider.calls.length,1);assert.equal(readdirSync(root).length,1);const promoted=r.chatGet(i.id,OWNER).messages;assert.deepEqual(promoted.slice(0,2).map(m=>m.seq),[1,2]);assert.ok(promoted.slice(2).every(m=>m.seq!>3));
  await r.projectSet(h.dir,{},OWNER);assert.equal(r.project.restoreFailed.has('room'),false);assert.equal((r.project.state.chats.chats[i.id]!.promotion as any).done,true);
@@ -49,7 +49,7 @@ test('154 ОКНА: queued lock rechecks persisted revision after await',async t
 });
 
 for(const after of [false,true])for(const stage of ['intent','chat','done'])test('154 recovery: '+stage+' write '+(after?'after':'before')+' physical save preserves batch/id',async t=>{
- let armed=false,failed=false;const io:StateIO={...diskIO,write(path,text){const data=path.endsWith('/chats.json')?JSON.parse(text):null,chat=data&&Object.values(data.chats).find((c:any)=>c.promotion&&(stage==='intent'?c.pane==='room':stage==='chat'?c.pane==='orchestrator'&&!c.promotion.done:c.promotion.done));if(armed&&!failed&&chat){failed=true;if(after)diskIO.write(path,text);throw Error('injected '+stage)}diskIO.write(path,text)}};
+ let armed=false,failed=false;const io:StateIO={...diskIO,write(path,text){const data=path.endsWith(join('state','chats.json'))?JSON.parse(text):null,chat=data&&Object.values(data.chats).find((c:any)=>c.promotion&&(stage==='intent'?c.pane==='room':stage==='chat'?c.pane==='orchestrator'&&!c.promotion.done:c.promotion.done));if(armed&&!failed&&chat){failed=true;if(after)diskIO.write(path,text);throw Error('injected '+stage)}diskIO.write(path,text)}};
  const h=await harness(t,{deps:{stateIO:io}}),r=h.runtime;r.roomSet({model:'w1'},OWNER);r.registry.get('room')!.record('me','one source');const i=input(r);armed=true;await assert.rejects(r.promoteChat(i.id,i.args,OWNER),code('write_failed'));assert.equal(h.provider.calls.length,0);armed=false;
  // Simulate abrupt process loss: do not flush in-memory state over the last physical bytes.
  r.project.closed=true;await r.close();const provider=new FakeProvider(),next=await createRuntime({...h.deps,providers:{claude:provider}},completedActions);t.after(()=>next.close());await next.promoteChat(i.id,i.args,OWNER);await next.idle();assert.equal(next.project.state.chats.active.orchestrator,i.id);assert.equal(provider.calls.length,1);assert.equal(next.journal.read({limit:0}).filter(x=>x.thread?.startsWith('promotion:')).length,2);
@@ -82,12 +82,12 @@ test('155 ОКНА: symlink substitution after validation never grants another d
 
 
 test('154 ОКНА: captured project root checked inside init lock; refusal still allows project navigation',async t=>{
- let root='',once=true;const git=new GitOps(async(args,path)=>{if(once&&root&&path?.startsWith(root+'/')){once=false;rmSync(path,{recursive:true});symlinkSync(root,path)}return {code:1,stdout:'',stderr:''}}),h=await harness(t,{deps:{gitops:git}}),r=h.runtime,other=join(h.dir,'other');root=join(h.dir,'projects');mkdirSync(root);mkdirSync(other);await r.settingsPatch('project',{projectsRoot:root},OWNER);r.roomSet({model:'w1',folder:false},OWNER);const i=input(r);
+ let root='',once=true;const git=new GitOps(async(args,path)=>{if(once&&root&&path?.startsWith(root+sep)){once=false;rmSync(path,{recursive:true});symlinkSync(root,path,process.platform==='win32'?'junction':'dir')}return {code:1,stdout:'',stderr:''}}),h=await harness(t,{deps:{gitops:git}}),r=h.runtime,other=join(h.dir,'other');root=join(h.dir,'projects');mkdirSync(root);mkdirSync(other);await r.settingsPatch('project',{projectsRoot:root},OWNER);r.roomSet({model:'w1',folder:false},OWNER);const i=input(r);
  await assert.rejects(r.promoteChat(i.id,i.args,OWNER),code('path_is_root'));assert.equal(existsSync(join(root,'.harness','team.yaml')),false);assert.equal(r.project.dir,h.dir);assert.equal(h.provider.calls.length,0);await r.projectSet(other,{},OWNER);assert.equal(r.project.dir,other);
 });
 
 for(const field of ['input','source','boundary'])test('154 absence: damaged saved '+field+' never becomes an agent or invokes a model',async t=>{
- let armed=false;const io:StateIO={...diskIO,write(path,text){diskIO.write(path,text);if(armed&&path.endsWith('/chats.json')&&Object.values(JSON.parse(text).chats).some((c:any)=>c.promotion)){armed=false;throw Error('intent saved')}}};
+ let armed=false;const io:StateIO={...diskIO,write(path,text){diskIO.write(path,text);if(armed&&path.endsWith(join('state','chats.json'))&&Object.values(JSON.parse(text).chats).some((c:any)=>c.promotion)){armed=false;throw Error('intent saved')}}};
  const h=await harness(t,{deps:{stateIO:io}}),r=h.runtime;r.roomSet({model:'w1'},OWNER);const i=input(r);await assert.rejects(r.promoteChat(i.id,i.args,{seat:'worker',trust:'agent'}),code('policy_denied'));armed=true;await assert.rejects(r.promoteChat(i.id,i.args,OWNER),/intent saved/);r.project.closed=true;await r.close();const path=join(h.dir,'.harness/state/chats.json'),saved=JSON.parse(readFileSync(path,'utf8'));delete saved.chats[i.id].promotion[field];writeFileSync(path,JSON.stringify(saved));
  const provider=new FakeProvider(),next=await createRuntime({...h.deps,providers:{claude:provider}},completedActions);t.after(()=>next.close());assert.equal(provider.calls.length,0);assert.equal(next.registry.get('orchestrator'),null);assert.match(next.lineErrors.join(';'),/повышение/);await assert.rejects(next.promoteChat(i.id,i.args,OWNER),code('promotion_invalid'));
 });
@@ -100,7 +100,7 @@ test('154: long conversation stays intact; oversized task is rejected before sav
 });
 
 for(const cut of ['none','intent','materialized'])test('154 МАСКАРАД: worker id orchestrator stays intact; allocated sid survives '+cut,async t=>{
- let armed=false,failed=false;const io:StateIO={...diskIO,write(path,text){diskIO.write(path,text);const data=path.endsWith('/chats.json')?JSON.parse(text):null;const c=data&&Object.values(data.chats).find((c:any)=>c.promotion&&c.promotion.sid==='orchestrator3'&&(cut==='intent'?c.pane==='room':c.pane==='orchestrator3'));if(armed&&!failed&&cut!=='none'&&c){failed=true;throw Error('saved '+cut)}}};
+ let armed=false,failed=false;const io:StateIO={...diskIO,write(path,text){diskIO.write(path,text);const data=path.endsWith(join('state','chats.json'))?JSON.parse(text):null;const c=data&&Object.values(data.chats).find((c:any)=>c.promotion&&c.promotion.sid==='orchestrator3'&&(cut==='intent'?c.pane==='room':c.pane==='orchestrator3'));if(armed&&!failed&&cut!=='none'&&c){failed=true;throw Error('saved '+cut)}}};
  const h=await harness(t,{seats:'  orchestrator: {kind: worker, role: researcher, label: Эксперт, vendor: claude, model: w1, mode: read}\n  orchestrator2: {kind: tester, role: tester, vendor: claude, model: w1, mode: read}',deps:{stateIO:io}}),r=h.runtime;
  r.registry.get('orchestrator')!.record('ai','existing worker answer');const before=structuredClone(r.registry.get('orchestrator')!.settings()),oldChat=r.chatsList(OWNER).active.orchestrator;r.roomSet({model:'w1'},OWNER);const i=input(r);armed=true;
  if(cut==='none'){assert.equal((await r.promoteChat(i.id,i.args,OWNER)).pane.id,'orchestrator3');await r.idle()}else {await assert.rejects(r.promoteChat(i.id,i.args,OWNER),code('write_failed'));assert.equal(h.provider.calls.length,0)}

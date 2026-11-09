@@ -36,16 +36,19 @@ test('5/14: valid last project wins; HARNESS_NO_LAST ignores it and preserves re
  const skipped=await bootstrap({...h.options,env:{...h.env,HARNESS_NO_LAST:'1'}});assert.equal(skipped.runtime.project.dir,h.env.CHAT_WORK_DIR);await skipped.close();assert.equal(readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),last);assert.equal(readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8'),registry)
 });
 
-test('Windows pilot keeps Autopilot unavailable without filling the owner journal with ledger errors',{skip:process.platform!=='win32'},async t=>{
+test('Windows Autopilot can be enabled through the owner API without starting an unrequested model',{skip:process.platform!=='win32'},async t=>{
  const h=setup(t),app=await bootstrap(h.options);t.after(()=>app.close());await app.runtime.idle();
  const status=await fetch(app.url+'/api/status').then(r=>r.json()) as any;
- assert.equal(status.autopilot.on,false);assert.equal(status.autopilot.available,false);
+ assert.equal(status.autopilot.on,false);assert.notEqual(status.autopilot.available,false);
  const before=app.runtime.settings.autopilot();
- const enabled=await fetch(app.url+'/api/autopilot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({project:status.project,instance:status.trace.instanceId,on:true,revision:before.revision})});
- assert.equal(enabled.status,409);assert.equal((await enabled.json() as any).code,'autopilot_unsupported');
- assert.deepEqual(app.runtime.settings.autopilot(),before);
+ const enabled=await fetch(app.url+'/api/autopilot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({project:status.project,instance:status.trace.instanceId,on:true,until:'morning',conditions:{operations:['answer_question'],maxSpendPercent:5},revision:before.revision})});
+ assert.equal(enabled.status,200);assert.equal((await enabled.json() as any).autopilot.on,true);
  const decisions=await fetch(app.url+'/api/autopilot/decisions').then(r=>r.json()) as any;
- assert.equal(decisions.available,false);assert.deepEqual(decisions.decisions,[]);
+ assert.deepEqual(decisions.decisions,[]);
+ const stopped=await fetch(app.url+'/api/autopilot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({project:status.project,instance:status.trace.instanceId,on:false,revision:app.runtime.settings.autopilot().revision})});
+ assert.equal(stopped.status,200);
+ assert.equal(app.runtime.settings.autopilot().on,false);
+ assert.equal(h.claude.calls.length,0);
  assert.equal(app.runtime.journal.read({limit:0}).some(row=>row.origin==='autopilot-owner'),false);
 });
 

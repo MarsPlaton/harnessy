@@ -45,7 +45,7 @@ export function metaRoutes(r:Runtime,router:RouterSource={health:routerHealthRea
  let network:Record<string,ReturnType<Runtime['networkRelay']['summary']>>|null=null,networkError:{code:string;reason:string}|null=null;
  try{network=Object.fromEntries([...new Set(['claude','codex',...Object.keys(programs.models),...Object.keys(api.models)])].map(id=>[id,r.networkRelay.summary(id)]))}catch(e){if(!(e instanceof ProjectError))throw e;networkError={code:e.code,reason:e.message}}
  const currentAutopilot=await r.autopilotStatus();sameProject(r,p);
- const autopilot=process.platform==='win32'?{...currentAutopilot,on:false,available:false,reason:'Автопилот пока недоступен на Windows: журнал решений требует защищённого хранения'}:currentAutopilot;
+ const autopilot=currentAutopilot;
  return json({project:p.dir,autopilot,network,networkError,trace:{instanceId:p.trace.instanceId,...p.trace.status},defaultDir:r.defaultDir,limits:r.limitsSnapshot(),models:{...programs.models,...api.models,claude:CLAUDE_MODELS,codex:models},turnModes:{...programs.turnModes,...api.turnModes,claude:{read:{ok:true},edit:{ok:true},all:{ok:true},chat:{ok:true},check:{ok:true},web:{ok:true},ask:{ok:true}},codex:{read:{ok:true},edit:{ok:true},all:{ok:true},chat:{ok:true},check:{ok:true},web:{ok:true},ask:{ok:true}}},modes:MODES,kinds:KINDS,
  ownerKinds:['task','question','note','stop','resume','decision'],lineErrors:[...p.lineErrors,...(api.apiError?[api.apiError.reason]:[])],apiError:api.apiError,policy:{version:p.policy?.version??null,path:p.policy?.path??null},
  team:{path:p.team?join(p.team.harnessDir,'team.yaml'):null,integrationBranch:p.team?.integrationBranch??null,mergeRoles:p.team?.mergeRoles??[]},repo:p.repoRoot,

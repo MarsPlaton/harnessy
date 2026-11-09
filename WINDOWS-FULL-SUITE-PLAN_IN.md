@@ -10,6 +10,7 @@ write_scope:
   - ".github/workflows/**"
   - "README.md"
   - "README.ru.md"
+  - ".gitattributes"
 forbidden:
   - "Do not migrate or modify the owner's existing OMG, AgentTeam, or other production projects."
   - "Do not call Claude/Codex through Harnessy with the owner's subscription until the provider-policy question is resolved."
