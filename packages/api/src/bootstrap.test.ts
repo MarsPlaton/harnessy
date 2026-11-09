@@ -22,7 +22,7 @@ test('5/14/15/16/71: startup falls back for missing/unreadable/deleted last proj
  for(const last of ['missing','unreadable','deleted']){
  if(existsSync(h.env.HARNESS_LAST_PROJECT_FILE!))rmSync(h.env.HARNESS_LAST_PROJECT_FILE!,{recursive:true});
  if(last==='unreadable')mkdirSync(h.env.HARNESS_LAST_PROJECT_FILE!);if(last==='deleted')writeFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,join(h.root,'deleted'));
- const app=await bootstrap(h.options);assert.equal(app.runtime.project.dir,h.env.CHAT_WORK_DIR);assert.ok(existsSync(h.env.HARNESS_PROJECTS_ROOT!));
+ const app=await bootstrap(h.options);t.after(()=>app.close());assert.equal(app.runtime.project.dir,realpathSync(h.env.CHAT_WORK_DIR!));assert.ok(existsSync(h.env.HARNESS_PROJECTS_ROOT!));
  const status=await fetch(app.url+'/api/status').then(r=>r.json()) as any;assert.equal(status.auth.claude.error,'claude не найден; задай CLAUDE_BIN');assert.equal(status.models.codex.length,2);
  const root=await fetch(app.url+'/',{redirect:'manual'});assert.equal(root.status,302);assert.equal(root.headers.get('location'),PROTO_ENTRY);await root.text();
  assert.equal((await fetch(app.url+'/sketches/missing')).status,404);assert.ok(h.log.some(s=>s.includes('папки нет — '+h.env.HARNESSY_SITE)));assert.ok(h.log.some(s=>s.includes('НЕТ — выполни в Терминале: claude auth login')));await app.close()
@@ -32,8 +32,8 @@ test('5/14/15/16/71: startup falls back for missing/unreadable/deleted last proj
 
 test('5/14: valid last project wins; HARNESS_NO_LAST ignores it and preserves registry/last bytes',async t=>{
  const h=setup(t),project=join(h.root,'last-project');mkdirSync(project);writeFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,project);writeFileSync(h.env.HARNESS_PROJECTS_FILE!,'[]');
- const selected=await bootstrap(h.options);assert.equal(selected.runtime.project.dir,project);await selected.close();const last=readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),registry=readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8');
- const skipped=await bootstrap({...h.options,env:{...h.env,HARNESS_NO_LAST:'1'}});assert.equal(skipped.runtime.project.dir,h.env.CHAT_WORK_DIR);await skipped.close();assert.equal(readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),last);assert.equal(readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8'),registry)
+ const selected=await bootstrap(h.options);t.after(()=>selected.close());assert.equal(selected.runtime.project.dir,realpathSync(project));await selected.close();const last=readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),registry=readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8');
+ const skipped=await bootstrap({...h.options,env:{...h.env,HARNESS_NO_LAST:'1'}});t.after(()=>skipped.close());assert.equal(skipped.runtime.project.dir,realpathSync(h.env.CHAT_WORK_DIR!));await skipped.close();assert.equal(readFileSync(h.env.HARNESS_LAST_PROJECT_FILE!,'utf8'),last);assert.equal(readFileSync(h.env.HARNESS_PROJECTS_FILE!,'utf8'),registry)
 });
 
 test('Windows Autopilot can be enabled through the owner API without starting an unrequested model',{skip:process.platform!=='win32'},async t=>{

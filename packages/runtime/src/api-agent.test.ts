@@ -68,8 +68,9 @@ test('21b secrets: arguments are masked before file, shell and peer effects; too
  const h=agentFixture(t),secret='fixture"\\route-key';h.seat.mode='all';writeFileSync(join(h.dir,'input'),secret);let command='',peer='';h.ctx.tools.ask=async args=>{peer=args.text;return {ok:false,code:'fixture_denied',error:'reflected '+secret}};const traces:any[]=[];h.ctx.traceEvent=e=>traces.push(e);
  const model=modelDouble((_r,index)=>index===0?[end([tool('write_file',{path:'result',text:secret}),tool('shell',{command:'printf '+secret},'shell'),tool('ask',{to:'reviewer',text:secret},'ask'),tool('read_file',{path:'input'},'read')],'tool-calls')]:[end([{type:'text',text:secret}])]);model.protection.add(secret);
  const result=await new ApiAgent('local',{service:()=>model.service,shell:async req=>{command=req.args.at(-1)!;return {stdout:secret,stderr:'',code:0,signal:null}}}).runTurn(h.seat,'task',h.ctx);
- assert.equal(command,'printf [ключ скрыт]');assert.equal(peer,'[ключ скрыт]');assert.equal(readFileSync(join(h.dir,'result'),'utf8'),'[ключ скрыт]');assert.equal(result.text,'[ключ скрыт]');
+ assert.equal(command,process.platform==='darwin'?'printf [ключ скрыт]':'');assert.equal(peer,'[ключ скрыт]');assert.equal(readFileSync(join(h.dir,'result'),'utf8'),'[ключ скрыт]');assert.equal(result.text,'[ключ скрыт]');
  const outputs=model.requests[1]!.messages.slice(2);assert.equal(JSON.stringify(outputs).includes(JSON.stringify(secret).slice(1,-1)),false);assert.equal(JSON.stringify([h.events,traces]).includes(JSON.stringify(secret).slice(1,-1)),false);assert.match(JSON.stringify(outputs),/ключ скрыт/);assert.match(JSON.stringify(h.events),/fixture_denied: reflected \[ключ скрыт\]/);
+ if(process.platform!=='darwin')assert.match(JSON.stringify(outputs),/sandbox_unavailable/);
 });
 
 test('21b secrets: cancellation drops a buffered credential prefix and a partial response is never retried',async t=>{

@@ -45,7 +45,7 @@ test('136: allowed internal links and a symlink to the project itself remain rea
 test('136: dangling links, unreadable text and invalid memory are failures, never an empty section',async t=>{
  const dir=fixture(t);mkdirSync(join(dir,'.harness','docs'),{recursive:true});const broken=join(dir,'.harness','docs','broken');symlinkSync(join(dir,'missing'),broken);await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));rmSync(broken);
  symlinkSync(join(dir,'.harness','docs'),join(dir,'.harness','docs','loop'));await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'));rmSync(join(dir,'.harness','docs','loop'));
- const p=put(dir,'docs/locked.txt','private');chmodSync(p,0);try{await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'))}finally{chmodSync(p,0o600)}
+ if(process.platform!=='win32'){const p=put(dir,'docs/locked.txt','private');chmodSync(p,0);try{await assert.rejects(readProjectSection(dir,'docs'),refusal('section_unreadable'))}finally{chmodSync(p,0o600)}}
  put(dir,'MEMORY.md',Buffer.from([0xff,0]));await assert.rejects(readProjectSection(dir,'memory'),refusal('section_unreadable'));
 });
 

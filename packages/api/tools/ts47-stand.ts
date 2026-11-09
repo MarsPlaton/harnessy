@@ -15,7 +15,7 @@ const portText=process.env.HARNESS_FAKE_PORT??'3794';
 if(!/^[1-9][0-9]{0,4}$/.test(portText)||Number(portText)>65535||Number(portText)===3777)throw Error('HARNESS_FAKE_PORT: нужен свободный порт 1–65535, кроме 3777');
 // Keep every run's generated proto separate, including when an auditor is already using another run.
 const port=Number(portText),data=mkdtempSync(join(dirname(root),'TS-47F-stand-')),site=join(data,'site');
-const built=spawnSync('python3',[join(root,'ui/deploy/build.py'),'--out',site],{cwd:root,stdio:'inherit'});
+const built=spawnSync(process.platform==='win32'?'python':'python3',[join(root,'ui/deploy/build.py'),'--out',site],{cwd:root,stdio:'inherit',env:{...process.env,PYTHONIOENCODING:'utf-8'}});
 if(built.error)throw built.error;if(built.status!==0)throw Error('Не удалось собрать proto: '+built.status);
 
 // A fresh sibling directory keeps all project and owner state outside the real projects.

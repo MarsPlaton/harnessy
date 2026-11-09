@@ -85,7 +85,7 @@ test('TS-39.1 authenticated place GET follows read_pane policy and never grants 
  }
 });
 test('TS-39.1 accepted task actions revoke until-reply autopilot; rejected writes leave it on',async t=>{
- const h=await held(t);async function enable(){const s=(await call(h.api,'/api/status')).body;const answer=await call(h.api,'/api/autopilot',{body:{project:h.dir,instance:s.trace.instanceId,revision:s.autopilot.revision,on:true,until:'reply',conditions:{operations:['answer_question'],maxSpendPercent:5}}});assert.equal(answer.status,200,JSON.stringify(answer.body))}
+ const h=await held(t);async function enable(){const s=(await call(h.api,'/api/status')).body;const answer=await call(h.api,'/api/autopilot',{body:{project:s.project,instance:s.trace.instanceId,revision:s.autopilot.revision,on:true,until:'reply',conditions:{operations:['answer_question'],maxSpendPercent:5}}});assert.equal(answer.status,200,JSON.stringify(answer.body))}
  await enable();assert.equal((await call(h.api,'/api/tasks',{body:body(h.runtime,1,{text:'x',instance:'forged'})})).body.code,'project_changed');assert.equal(h.runtime.settings.autopilot().on,true);
  const a=await create(h,1);assert.equal(h.runtime.settings.autopilot().on,false);await enable();assert.equal((await call(h.api,'/api/tasks/'+a.taskId+'/assign',{body:body(h.runtime,2,{to:'worker',expectedState:a.expectedState})})).status,200);assert.equal(h.runtime.settings.autopilot().on,false);
 });
@@ -95,6 +95,6 @@ test('TS-39.1 skip only changes tasks in that attempt, including after restart',
  h.provider.onRun=async(seat,_message,ctx)=>{ctx.modelStarted?.();ctx.publish({type:'done',sessionId:'s',model:seat.model,durationMs:1,usage:{input:1,output:1,cacheRead:0}});return {text:'Без типизированного исхода',sessionId:'s'}};
  await h.runtime.halt(false,OWNER);await h.runtime.idle();assert.equal((await list(h)).tasks[0].state,'work');
  h.provider.onRun=async()=>{throw Error('Не начался второй ход')};const b=await create(h,202,{to:'worker'});await h.runtime.idle();const waiting=h.runtime.waiting('worker')!;assert.deepEqual(waiting.recordSeqs,[b.assignedSeq]);
- assert.equal((await call(h.api,'/api/panes/worker/attempt',{body:{project:h.dir,turnInstanceId:waiting.turnInstanceId,action:'skip'}})).status,200);await h.runtime.idle();
+ assert.equal((await call(h.api,'/api/panes/worker/attempt',{body:{project:h.runtime.project.dir,turnInstanceId:waiting.turnInstanceId,action:'skip'}})).status,200);await h.runtime.idle();
  for(const restart of [false,true]){if(restart)await h.runtime.openProject(h.dir);const rows=(await list(h)).tasks;assert.equal(rows.find((row:any)=>row.taskId===a.taskId).state,'work');assert.equal(rows.find((row:any)=>row.taskId===b.taskId).state,'unknown')}
 });

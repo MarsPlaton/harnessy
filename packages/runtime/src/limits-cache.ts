@@ -30,7 +30,9 @@ export class SharedLimitsCache {
  constructor(dir:string,now:()=>number){this.dir=dir;this.now=now}
  path(vendor:Vendor){return join(this.dir,vendor+'.json')}
  load(vendor:Vendor):SharedSnapshot|null{
- let fd:number;try{if(realpathSync(this.dir)!==resolve(this.dir))throw Error('unsafe cache directory');fd=openSync(this.path(vendor),constants.O_RDONLY|constants.O_NOFOLLOW)}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return null;throw e}
+ let fd:number|undefined;try{if(realpathSync(this.dir)!==resolve(this.dir))throw Error('unsafe cache directory');const before=lstatSync(this.path(vendor));if(!before.isFile()||before.isSymbolicLink())throw Error('unsafe cache file');fd=openSync(this.path(vendor),constants.O_RDONLY|constants.O_NOFOLLOW);
+  const opened=fstatSync(fd),after=lstatSync(this.path(vendor));if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino||after.isSymbolicLink()||after.dev!==before.dev||after.ino!==before.ino)throw Error('unsafe cache file')
+ }catch(e){if(fd!==undefined)closeSync(fd);if((e as NodeJS.ErrnoException).code==='ENOENT')return null;throw e}
  let raw:unknown;try{const stat=fstatSync(fd);if(!stat.isFile()||stat.size>65536)throw Error('unsafe cache file');try{raw=JSON.parse(readFileSync(fd,'utf8'))}catch{return null}}finally{closeSync(fd)}
  if(!record(raw)||raw.version!==1||raw.vendor!==vendor||typeof raw.attemptedAt!=='number'||!Number.isFinite(raw.attemptedAt)||raw.attemptedAt<=0||raw.attemptedAt>this.now()+60||!(raw.retryAt===null||typeof raw.retryAt==='number'&&Number.isFinite(raw.retryAt)&&raw.retryAt>=raw.attemptedAt)||!Number.isSafeInteger(raw.backoff)||Number(raw.backoff)<0||Number(raw.backoff)>1800||!(raw.pending===null||typeof raw.pending==='string'&&/^[a-f0-9-]{36}$/.test(raw.pending))||!(raw.code===null||typeof raw.code==='string'&&Object.hasOwn(reasons,raw.code)))return null;
  const value=raw.value===null?null:saved(raw.value,vendor,this.now());if(raw.value!==null&&!value||!value&&raw.code===null&&raw.pending===null||raw.retryAt!==null&&(raw.pending!==null||!['limits_rate_limited','limits_unavailable'].includes(String(raw.code))))return null;
