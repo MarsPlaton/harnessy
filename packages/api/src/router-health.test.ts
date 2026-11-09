@@ -24,7 +24,7 @@ test('321: only model names leave routes.json; missing, malformed, symlink and o
  assert.equal(readRouterModels(path).ok,false);
  const raw={routes:{'gpt-routed':{keyFile:join(dir,'key-must-never-be-opened'),key:'sk_test_DO_NOT_EXPOSE',baseUrl:'https://private.example/api'},'qwen3':{}},fallbackModels:['kimi:cloud','gpt-routed'],token:'sk_test_DO_NOT_EXPOSE'};writeFileSync(path,JSON.stringify(raw));
  assert.deepEqual(readRouterModels(path),{ok:true,models:['gpt-routed','qwen3','kimi:cloud']});
- const link=join(dir,'link');symlinkSync(path,link);assert.equal(readRouterModels(link).ok,false);
+ const link=join(dir,'link');try{symlinkSync(path,link);assert.equal(readRouterModels(link).ok,false)}catch(e){if(process.platform!=='win32'||(e as NodeJS.ErrnoException).code!=='EPERM')throw e}
  for(const bad of ['{',JSON.stringify({routes:{},fallbackModels:'bad'}),JSON.stringify({routes:{'<img>':{}},fallbackModels:[]}),JSON.stringify({routes:[],fallbackModels:[]})]){writeFileSync(path,bad);assert.equal(readRouterModels(path).ok,false)}
  writeFileSync(path,' '.repeat(ROUTER_CONFIG_LIMIT+1));assert.equal(readRouterModels(path).ok,false);assert.equal(readRouterModels(dir).ok,false);
 });

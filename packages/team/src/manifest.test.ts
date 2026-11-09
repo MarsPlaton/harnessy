@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,realpathSync,readFileSync,writeFileSync,rmSync,unlinkSync,mkdirSync,symlinkSync,existsSync,cpSync} from 'node:fs';
+import {mkdtempSync,realpathSync,readFileSync,writeFileSync,rmSync,rmdirSync,unlinkSync,mkdirSync,symlinkSync,existsSync,cpSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {loadTeam,ensureLine,seedOrchestrator,addSeat,instructionsFor,roleOf,TeamError,TEMPLATES,TEAM_HEADER,dumpYaml,parseYaml,withPathLock} from './index.ts';
@@ -30,7 +30,7 @@ test('[7,8,21,32] templates never overwrite, missing template preflight, seed ha
  }finally{rmSync(root,{recursive:true,force:true})}
 });
 test('[9,23,27,35] concurrent seats, canonical lock, specialization isolation and write rollback',async()=>{
- const root=temp();try{const h=await ensureLine(root),alias=root+'-link';symlinkSync(root,alias,'dir');try{
+ const root=temp();try{const h=await ensureLine(root),alias=root+'-link';symlinkSync(root,alias,process.platform==='win32'?'junction':'dir');try{
  const base=readFileSync(join(h,'roles','reviewer.md'),'utf8');const one=await addSeat(h,{...defaults,role:'reviewer',specialization:{title:'Юрист',text:'Проверяй договор'}}),two=await addSeat(h,{...defaults,role:'reviewer'});
  const team=loadTeam(h);assert.equal(one.instructions,'roles/seats/reviewer.md');assert.equal(one.label,'Юрист');assert.equal(two.label,'ревьюер 2');assert.equal(instructionsFor(team,one),base+'\n\nПроверяй договор');assert.equal(instructionsFor(team,two),base);
  const calls=await Promise.allSettled([addSeat(h,{...defaults,role:'tester'}),addSeat(join(alias,'.harness'),{...defaults,role:'tester'})]);assert.equal(calls.filter(r=>r.status==='fulfilled').length,1);assert.equal((calls.find(r=>r.status==='rejected') as PromiseRejectedResult).reason.code,'role_taken');
@@ -38,7 +38,7 @@ test('[9,23,27,35] concurrent seats, canonical lock, specialization isolation an
  const before=readFileSync(join(h,'team.yaml'));await assert.rejects(addSeat(h,{...defaults,role:'architect',specialization:{title:'A',text:'B'}},{replace:()=>{throw Error('rename fault')}}),failure('write_failed'));assert.equal(existsSync(join(h,'roles','seats','architect.md')),false);assert.deepEqual(readFileSync(join(h,'team.yaml')),before);
  writeFileSync(join(h,'roles','seats','architect.md'),'foreign');await assert.rejects(addSeat(h,{...defaults,role:'architect',specialization:{title:'A',text:'B'}}),failure('seat_file_exists'));assert.equal(readFileSync(join(h,'roles','seats','architect.md'),'utf8'),'foreign');
  for(const specialization of [{title:'',text:'x'},{title:'x',text:''},{title:'x'.repeat(61),text:'x'},{title:'x',text:'x'.repeat(20001)}])await assert.rejects(addSeat(h,{...defaults,role:'researcher',specialization}),failure('specialization_invalid'));
- }finally{unlinkSync(alias)}}finally{rmSync(root,{recursive:true,force:true})}
+ }finally{if(process.platform==='win32')rmdirSync(alias);else unlinkSync(alias)}}finally{rmSync(root,{recursive:true,force:true})}
 });
 test('[23] seed and ensureLine share a lock; retained unsupported vendors count for numbering and collision refuses',async()=>{
  const root=temp();try{const h=await ensureLine(root);await Promise.all([ensureLine(root),seedOrchestrator(h,'claude','m')]);assert.ok(loadTeam(h).seats.orchestrator);

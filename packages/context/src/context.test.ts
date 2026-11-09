@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {memorySections,onboarding,roleNote,handoffPrompt,transcriptText,digest,estTokens,contextWindow,contextCard,DIGEST_MARK,type SeatView,type RoleNoteDeps,type OnboardingDeps,type TranscriptMessage,type DigestViewer,type DigestPane,type CardPane,type CardDeps} from './index.ts';
 import {pythonRound} from './tokens.ts';
 interface Golden {
@@ -16,7 +17,7 @@ const golden=JSON.parse(readFileSync(new URL('./fixtures/python.json',import.met
 function freeze<T>(value:T):T {if(value&&typeof value==='object'){for(const v of Object.values(value))freeze(v);Object.freeze(value)}return value}
 for(const [i,c] of golden.memory.entries())test('[39] Python memory sections '+i+': placeholders, duplicate headings, order and Unicode',()=>{assert.deepEqual([...memorySections(c.text)],c.expected)});
 for(const c of golden.roleNotes)test('[39] Python roleNote '+c.name,()=>{const note=roleNote(freeze(c.seat),freeze(c.deps));/* 156 adds the team-tool instructions to the orchestrator; historical fixture bytes stay unchanged. */assert.equal(note.replace(/ Команду создавай через propose_seats:.*$/,''),c.expected)});
-for(const c of golden.onboarding)test('[18,39,45] Python onboarding '+c.name,()=>{const deps={...c.deps,now:new Date(c.deps.now)};/* 231 adds the artifact contract; the Python baseline is immutable. */const expected=c.expected.replace('Твоя модель:', 'Артефакты клади в artifacts/ проекта и ссылайся на них относительным путём; таблицы — Markdown.\n\nТвоя модель:');assert.equal(onboarding(freeze(c.seat),c.how,freeze(deps)),expected)});
+for(const c of golden.onboarding)test('[18,39,45] Python onboarding '+c.name,()=>{const deps={...c.deps,now:new Date(c.deps.now)};/* 231 adds the artifact contract; the Python baseline is immutable. */const expected=c.expected.replace('Твоя модель:', 'Артефакты клади в artifacts/ проекта и ссылайся на них относительным путём; таблицы — Markdown.\n\nТвоя модель:').replaceAll(c.deps.projectDir+'/.harness/MEMORY.md',join(c.deps.projectDir,'.harness','MEMORY.md')).replaceAll(c.deps.projectDir+'/.harness/state/channel.ndjson',join(c.deps.projectDir,'.harness','state','channel.ndjson'));assert.equal(onboarding(freeze(c.seat),c.how,freeze(deps)),expected)});
 for(const [i,c] of golden.transcripts.entries())test('[39,46] Python transcript '+i+' with empty result skipped',()=>{assert.equal(transcriptText(freeze(c.transcript),c.limit),c.expected)});
 for(const c of golden.digests)test('[29,39,46] Python digest '+c.name+' returns unconsumed nextSeen',()=>{const before=structuredClone(c.viewer);assert.deepEqual(digest(freeze(c.viewer),freeze(c.others),(_,target)=>c.allowed.includes(target)),c.expected);assert.deepEqual(c.viewer,before)});
 for(const c of golden.cards)test('[21,39] Python contextCard '+c.name,()=>{

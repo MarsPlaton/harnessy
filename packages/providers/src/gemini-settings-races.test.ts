@@ -14,7 +14,18 @@ test('47.11 r2: a stale hard-linked settings name cannot truncate owner data',as
  assert.equal(readFileSync(owner,'utf8'),'owner data');assert.equal(existsSync(join(directory,'settings.json')),false);
 });
 
+if(process.platform==='win32')test('47.11 r2: Windows refuses to rename an ancestor while prepared settings are open',async t=>{
+ const h=await cliFixture(t,'probe'),directory=join(realpathSync(h.dir),'config');mkdirSync(directory);
+ const guard=geminiSettingsGuard(directory);try{
+  guard.write('{"hooksConfig":{"enabled":false}}');
+  assert.throws(()=>renameSync(directory,directory+'-old'),{code:'EPERM'});
+  guard.validate();
+ }finally{guard.dispose()}
+ assert.equal(existsSync(join(directory,'settings.json')),false);
+});
+
 for(const attack of ['directory','file','overwrite','parent','symlink','move-outside'] as const)test('47.11 r2: rejects '+attack+' during beforeModel and removes the original token file',async t=>{
+ if(process.platform==='win32'&&['directory','parent','symlink'].includes(attack)){t.skip('Windows denies renaming an ancestor of the open settings file');return}
  const h=await cliFixture(t,'probe'),state=join(h.dir,'private-state'),owner=join(h.dir,'owner');mkdirSync(state);mkdirSync(join(owner,'.gemini'),{recursive:true});
  writeFileSync(join(owner,'.gemini','google_accounts.json'),JSON.stringify({active:'fixture@example.test'}));
  const config=join(state,'gemini',createHash('sha256').update(realpathSync(h.dir)).digest('hex'),'worker','.gemini'),settings=join(config,'settings.json');
@@ -39,6 +50,8 @@ for(const attack of ['directory','file','overwrite','parent','symlink','move-out
   original=attack==='file'?settings+'.old':join(h.dir,'moved-settings.json');renameSync(settings,original);writeFileSync(settings,JSON.stringify(value));
  }else writeFileSync(settings,JSON.stringify(value));
  release();await rejected;
- assert.equal(starts,0);assert.equal(existsSync(original),false,'the prepared inode must not retain its token under a renamed path');
+ assert.equal(starts,0);
+ if(process.platform==='win32'&&attack==='move-outside')assert.equal(readFileSync(original,'utf8'),'','the moved inode must not retain its token');
+ else assert.equal(existsSync(original),false,'the prepared inode must not retain its token under a renamed path');
  assert.deepEqual(h.registered,h.revoked);assert.equal(readdirSync(join(state,'gemini')).some(name=>name.startsWith('.leases-')),false);
 });

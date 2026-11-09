@@ -15,8 +15,10 @@ export class AutopilotSpendBudget implements AutopilotBudgetPort {
  private readonly path:string;private project:string;private quotes:AutopilotSpendQuotes;
  constructor(project:string,quotes:AutopilotSpendQuotes){this.project=project;this.quotes=quotes;this.path=join(project,'.harness','state','autopilot-spend.json')}
  private read():Reservation[]{
+  const parent=join(this.project,'.harness','state');
+  if(process.platform!=='win32'&&(realpathSync(parent)!==parent||lstatSync(parent).uid!==process.getuid?.()))throw invalid();
   try{lstatSync(this.path)}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return [];throw error}
-  const parent=join(this.project,'.harness','state');if(process.platform==='win32'){try{assertPrivateDirectory(parent)}catch{throw invalid()}}else if(realpathSync(parent)!==parent||lstatSync(parent).uid!==process.getuid?.())throw invalid();
+  if(process.platform==='win32')try{assertPrivateDirectory(parent)}catch{throw invalid()};
   let fd:number|undefined;
   try{const info=lstatSync(this.path);if(!info.isFile()||info.isSymbolicLink()||info.size>4*1024*1024||process.platform!=='win32'&&(info.uid!==process.getuid?.()||(info.mode&0o077)!==0))throw invalid();if(process.platform==='win32')try{assertPrivateFile(this.path)}catch{throw invalid()};fd=openSync(this.path,constants.O_RDONLY|constants.O_NOFOLLOW);const stat=fstatSync(fd);if(!stat.isFile()||stat.size>4*1024*1024)throw invalid();if(process.platform==='win32')try{const current=assertPrivateFile(this.path);if(current.dev!==stat.dev||current.ino!==stat.ino)throw invalid()}catch{throw invalid()};const data=JSON.parse(readFileSync(fd,'utf8'));if(!Array.isArray(data)||data.some(r=>!r||!Number.isSafeInteger(r.generation)||r.generation<1||typeof r.window!=='string'||!r.window||!percentage(r.baseline)||!Number.isFinite(r.amount)||r.amount<0||!Number.isSafeInteger(r.uses)||r.uses<0))throw invalid();return data}
   catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return [];throw e}finally{if(fd!==undefined)closeSync(fd)}

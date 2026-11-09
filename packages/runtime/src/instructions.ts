@@ -33,7 +33,8 @@ export async function updateInstruction(runtime:Runtime,id:string,input:Record<s
   const nextHash=hash(Buffer.from(text)),verify=()=>{current();let now:ReturnType<typeof target>;try{now=target(p,id)}catch{return fail('target_changed','Цель инструкции изменилась. Перечитайте файл.')}
    if(['requested','canonical','parent','parentIdentity','canonicalParent','canonicalParentIdentity','identity'].some(key=>now[key as keyof typeof now]!==before[key as keyof typeof before]))fail('target_changed','Цель инструкции изменилась. Перечитайте файл.');if(now.hash!==before.hash)fail('file_changed','Файл изменился. Перечитайте инструкцию.');};
   p.journal.append({sender:'harness',to:['owner'],kind:'note',origin:'instruction-update',text:'Инструкция '+id+': '+(before.hash??'файл отсутствует')+' → '+nextHash});
-  verify();atomicWrite(before.canonical,text,(from,to)=>{verify();renameSync(from,to)});const fd=openSync(before.canonicalParent,'r');try{fsyncSync(fd)}finally{closeSync(fd)}
+  verify();atomicWrite(before.canonical,text,(from,to)=>{verify();renameSync(from,to)});
+  if(process.platform!=='win32'){const fd=openSync(before.canonicalParent,'r');try{fsyncSync(fd)}finally{closeSync(fd)}}
   p.team=loadTeam(p.team!.harnessDir);runtime.ownerAutopilotAction(p,initiator);p.owner.publish({type:'instructionUpdated',project:p.dir,pane:id,hash:nextHash});
   return {...readReceipt(p,id,target(p,id)),appliesFrom:'next' as const};
  });

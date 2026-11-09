@@ -51,7 +51,7 @@ npm --prefix ui/desktop ci
 npm --prefix ui/desktop run dist:win
 ```
 
-The output is an **unsigned ZIP** in `ui/desktop/release/`. Extract it and launch `Harnessy-alpha.exe`; the bundled engine needs no system Node.js. Claude/Codex executables are found on `PATH`, including paths with spaces. The Windows pilot keeps API-agent shell execution unavailable because its macOS Seatbelt protection has no Windows equivalent here. Autopilot can be enabled when its decision files pass Windows ACL checks. API-key storage and SSH/proxy management have not been ported; automatic updates are disabled for the unsigned Windows archive. The packaged engine and Autopilot on/off flow have been checked with isolated project data. Live subscription use through Harnessy remains paused pending provider-policy confirmation; the complete Windows test suite is still being stabilized.
+The output is an **unsigned ZIP** in `ui/desktop/release/`. Extract it and launch `Harnessy-alpha.exe`; the bundled engine needs no system Node.js. Claude/Codex executables are found on `PATH`, including paths with spaces. The Windows pilot keeps API-agent shell execution unavailable because its macOS Seatbelt protection has no Windows equivalent here. Autopilot can be enabled when its decision files pass Windows ACL checks. API-key storage and SSH tunnel management have not been ported; direct and proxy routes remain available. Automatic updates are disabled for the unsigned Windows archive. The packaged engine and Autopilot on/off flow have been checked with isolated project data. Live subscription use through Harnessy remains paused pending provider-policy confirmation; the complete Windows test suite is still being stabilized.
 
 ## Six architecture questions
 

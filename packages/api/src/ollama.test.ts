@@ -69,8 +69,8 @@ test('21d: a probe cannot use file/peer tools or turn one approval into a second
 });
 
 test('21d: Ollama tool calls use the Harnessy shell boundary and retain external files',async t=>{
- const {f,h}=await setup(t),outside=join(f.dir,'outside');writeFileSync(outside,'unchanged');symlinkSync(f.dir,join(h.dir,'escape'));let step=0;f.setRespond(res=>ollamaAnswer(res,step++===0?{name:'shell',arguments:{command:'printf bad > escape/outside'}}:'готов'));
- const select=await call(h.api,'/api/panes/worker',{body:{vendor:'ollama',model:'gemma4:latest',mode:'all',binding:h.runtime.paneBinding('worker')}});assert.equal(select.status,200,select.text);await h.runtime.runTurn('worker','bounded shell');assert.equal(readFileSync(outside,'utf8'),'unchanged');assert.match(JSON.stringify(f.capture()[1].messages),/shell_failed/);assert.equal(h.codex.calls.length,0);
+ const {f,h}=await setup(t),outside=join(f.dir,'outside');writeFileSync(outside,'unchanged');symlinkSync(f.dir,join(h.dir,'escape'),process.platform==='win32'?'junction':'dir');let step=0;f.setRespond(res=>ollamaAnswer(res,step++===0?{name:'shell',arguments:{command:'printf bad > escape/outside'}}:'готов'));
+ const select=await call(h.api,'/api/panes/worker',{body:{vendor:'ollama',model:'gemma4:latest',mode:'all',binding:h.runtime.paneBinding('worker')}});assert.equal(select.status,200,select.text);await h.runtime.runTurn('worker','bounded shell');assert.equal(readFileSync(outside,'utf8'),'unchanged');assert.match(JSON.stringify(f.capture()[1].messages),process.platform==='darwin'?/shell_failed/:/sandbox_unavailable/);assert.equal(h.codex.calls.length,0);
 });
 
 

@@ -1,4 +1,4 @@
-import {constants,openSync,fstatSync,readSync,closeSync} from 'node:fs';
+import {constants,openSync,fstatSync,lstatSync,readSync,closeSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
 export type RouterHealth={ok:true;models:string[];families:string[]}|{ok:false;reason:string};
@@ -9,8 +9,9 @@ const modelId=(value:unknown):value is string=>typeof value==='string'&&/^[a-zA-
 export function readRouterModels(path=join(homedir(),'.codex/provider-router/routes.json')):RouterModels{
  let fd:number|undefined;
  try{
-  fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);const stat=fstatSync(fd);
-  if(!stat.isFile()||stat.size>ROUTER_CONFIG_LIMIT)throw Error('invalid');
+  const before=lstatSync(path);if(!before.isFile()||before.isSymbolicLink())throw Error('invalid');
+  fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);const stat=fstatSync(fd),after=lstatSync(path);
+  if(!stat.isFile()||stat.size>ROUTER_CONFIG_LIMIT||after.isSymbolicLink()||after.dev!==before.dev||after.ino!==before.ino||stat.dev!==before.dev||stat.ino!==before.ino)throw Error('invalid');
   const buffer=Buffer.alloc(ROUTER_CONFIG_LIMIT+1);let size=0;
   while(size<buffer.length){const n=readSync(fd,buffer,size,buffer.length-size,null);if(!n)break;size+=n}
   if(size>ROUTER_CONFIG_LIMIT)throw Error('invalid');

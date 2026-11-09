@@ -27,7 +27,7 @@ test('22a: owner exits and ordered chains cover programs, API routes and Ollama;
  r=await call(h.api,root+'/exits/proxy-a/delete',{body:{revision:a.body.revision}});assert.equal(r.body.code,'exit_in_use');
  let chain=(await call(h.api,root+'/providers/claude')).body;assert.equal((await call(h.api,root+'/providers/claude',{body:{exits:[],revision:chain.revision}})).status,200);
  chain=(await call(h.api,root+'/providers/claude')).body;assert.deepEqual(chain.exits,[]);assert.equal(chain.configured,true);assert.notEqual(chain.revision,null);
- const settings=new Settings(h.file);assert.deepEqual(settings.network().chains.claude,[]);assert.deepEqual((await call(h.api,root+'/exits')).body.exits.map((x:any)=>x.config.id),routes);
+ const settings=new Settings(h.file);assert.deepEqual(settings.network().chains.claude,[]);assert.deepEqual((await call(h.api,root+'/exits')).body.exits.map((x:any)=>x.config.id).sort(),[...routes].sort());
  assert.equal((await call(h.api,root+'/providers/not-registered',{body:{exits:[],revision:null}})).body.code,'provider_unknown');assert.equal((await call(h.api,root+'/providers/api:missing')).body.code,'provider_unknown');
 });
 

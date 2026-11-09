@@ -212,7 +212,7 @@ test('TS-38.3: missing cost and linked project state cannot masquerade as a deci
  const project=mkdtempSync(join(tmpdir(),'harnessy-decisions-')),outside=mkdtempSync(join(tmpdir(),'harnessy-decisions-outside-'));t.after(()=>{rmSync(project,{recursive:true,force:true});rmSync(outside,{recursive:true,force:true})});
  const base=decision(project),ledger=new AutopilotDecisionLedger(project);
  await assert.rejects(ledger.intent({...base,cost:undefined as never}),{code:'decision_invalid'});
- symlinkSync(outside,join(project,'.harness'));
+ symlinkSync(outside,join(project,'.harness'),process.platform==='win32'?'junction':'dir');
  await assert.rejects(ledger.intent({...base,cost:unknownCost}),{code:'decision_invalid'});
  assert.equal(existsSync(join(outside,'state','autopilot-decisions.ndjson')),false);
 });

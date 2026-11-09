@@ -1,14 +1,24 @@
 import test from 'node:test';
 import {object} from './errors.ts';
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdtempSync,readFileSync,renameSync,rmSync,symlinkSync,unlinkSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {harness,OWNER,deferred,until} from './test-helpers.ts';
 import {AutopilotSpendBudget,type AutopilotSpendQuotes} from './autopilot-budget.ts';
 import {RuntimeAutopilotSafety,autopilotAssignmentSource} from './autopilot-runtime.ts';
 const seats='  orchestrator: {role: orchestrator, vendor: claude, label: оркестратор, model: w1, mode: chat, digest: false}\n  reviewer: {role: reviewer, vendor: claude, label: ревьюер, model: w2, mode: chat, digest: false}\n  worker: {role: executor, vendor: claude, label: воркер, model: w1, mode: chat, digest: false}';
 const policy=(dir:string)=>writeFileSync(join(dir,'.harness','comms-policy.yaml'),readFileSync(new URL('../../team/templates/comms-policy.yaml',import.meta.url)));
 const quotes=async(calls:readonly unknown[])=>calls.map(()=>({window:'claude:weekly:1',percentUsed:20,upperPercent:0.01,basis:'stub verified weekly upper bound'}));
+test('first budget reservation rejects a linked state directory before writing',{skip:process.platform==='win32'},async t=>{
+ const h=await harness(t,{noRepository:true}),state=join(h.dir,'.harness','state'),original=state+'-original',outside=mkdtempSync(join(tmpdir(),'harnessy-budget-outside-'));
+ renameSync(state,original);symlinkSync(outside,state,'dir');
+ try{
+  const budget=new AutopilotSpendBudget(h.dir,quotes);
+  await assert.rejects(budget.reserve({project:h.dir,generation:1,maxSpendPercent:1,calls:[{seat:'o',model:'m',purpose:'proposal',round:1}]}),{code:'spend_unknown'});
+  assert.equal(existsSync(join(outside,'autopilot-spend.json')),false);
+ }finally{unlinkSync(state);renameSync(original,state);rmSync(outside,{recursive:true,force:true})}
+});
 const line=(s:string,p:string)=>s.split('\n').find(l=>l.startsWith(p))!.slice(p.length);
 async function setup(t:Parameters<typeof harness>[0],options:{quoted?:boolean;quotes?:AutopilotSpendQuotes;review?:'agree'|'objection';operations?:string[]}={}){
  const h=await harness(t,{noRepository:true,seats,before:policy,deps:options.quoted===false?{}:{autopilotSpendQuotes:options.quotes??quotes}});
