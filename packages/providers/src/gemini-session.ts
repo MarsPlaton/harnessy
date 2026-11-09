@@ -1,7 +1,8 @@
-import {lstat,mkdir,open,readdir,readFile,writeFile,realpath} from 'node:fs/promises';
+import {lstat,mkdir,open,readdir,readFile,writeFile} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {join} from 'node:path';
 import {ProviderError} from './types.ts';
+import {canonicalPath} from '@harnessy/team';
 
 const missing=()=>new ProviderError('session_missing','Gemini: исходная сессия недоступна');
 async function directory(path:string){const s=await lstat(path);if(!s.isDirectory()||s.isSymbolicLink())throw missing()}
@@ -16,7 +17,7 @@ async function session(path:string,id:string){
 export async function importGeminiSession(source:string,target:string,cwd:string,id:string|null,validate:()=>void){
  if(!id)return;
  if(!/^[0-9a-f-]{36}$/i.test(id))throw missing();
- const project=await realpath(cwd);
+ const project=canonicalPath(cwd);
  const registry=async(root:string)=>{try{const r=JSON.parse(await readFile(join(root,'projects.json'),'utf8'));const key=r.projects?.[project];return typeof key==='string'&&/^[a-z0-9-]+$/.test(key)?key:null}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return null;throw e}};
  const find=async(root:string,key:string)=>{try{
   await directory(root);await directory(join(root,'tmp'));await directory(join(root,'tmp',key));

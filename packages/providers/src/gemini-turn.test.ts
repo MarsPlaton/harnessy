@@ -23,7 +23,7 @@ test('303/306/47.11: Gemini 0.63 rejects user-owned system settings; private use
  if(process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH){console.error('Security Warning: Skipping system settings file: Parent directory is insecure: not owned by root');process.exit(1)}
  const dir=require('node:path').join(process.env.GEMINI_CLI_HOME,'.gemini'),path=require('node:path').join(dir,'settings.json'),config=JSON.parse(fs.readFileSync(path,'utf8'));
  const resume=fs.existsSync(require('node:path').join(dir,'session-marker'));fs.writeFileSync(require('node:path').join(dir,'session-marker'),'session');
- if(!resume){const path=require('node:path');fs.mkdirSync(path.join(dir,'tmp','fixture','chats'),{recursive:true});fs.writeFileSync(path.join(dir,'projects.json'),JSON.stringify({projects:{[process.cwd()]:'fixture'}}));fs.writeFileSync(path.join(dir,'tmp','fixture','chats','session-2026-ab123456.jsonl'),JSON.stringify({sessionId:'ab123456-1234-1234-1234-123456789abc'})+'\n');}
+ if(!resume){const path=require('node:path');fs.mkdirSync(path.join(dir,'tmp','fixture','chats'),{recursive:true});fs.writeFileSync(path.join(dir,'projects.json'),JSON.stringify({projects:{[fs.realpathSync.native(process.cwd())]:'fixture'}}));fs.writeFileSync(path.join(dir,'tmp','fixture','chats','session-2026-ab123456.jsonl'),JSON.stringify({sessionId:'ab123456-1234-1234-1234-123456789abc'})+'\n');}
  if(fs.readFileSync(require('node:path').join(dir,'oauth_creds.json'),'utf8')!=='fixture-login')process.exit(2);
  fs.writeFileSync(require('node:path').join(dir,'oauth_creds.json'),'refreshed-private');
  fs.writeFileSync(process.env.TEST_LOG,JSON.stringify({args,path,config,resume,mode:fs.statSync(path).mode&511,home:process.env.HOME,key:!!process.env.GEMINI_API_KEY}));
@@ -39,7 +39,7 @@ test('303/306/47.11: Gemini 0.63 rejects user-owned system settings; private use
 test('47.11: only the exact legacy Gemini session is imported; owner files stay unchanged',async t=>{
  const h=await cliFixture(t,'probe'),source=join(h.dir,'old'),target=join(h.dir,'new'),id='ab123456-1234-1234-1234-123456789abc';
  const chats=join(source,'tmp','fixture','chats');mkdirSync(chats,{recursive:true});mkdirSync(target);
- writeFileSync(join(source,'projects.json'),JSON.stringify({projects:{[realpathSync(h.dir)]:'fixture'}}));
+ writeFileSync(join(source,'projects.json'),JSON.stringify({projects:{[realpathSync.native(h.dir)]:'fixture'}}));
  const filename='session-2026-ab123456.jsonl',body=JSON.stringify({sessionId:id,projectHash:'project'})+'\n'+JSON.stringify({id:'message',type:'user',content:'saved text'})+'\n';
  writeFileSync(join(chats,filename),body);writeFileSync(join(chats,'session-2026-ffffffff.jsonl'),JSON.stringify({sessionId:'ffffffff-0000-0000-0000-000000000000'})+'\n');writeFileSync(join(source,'settings.json'),'owner-settings');
  const {importGeminiSession}=await import('./gemini-session.ts');await importGeminiSession(source,target,h.dir,id,()=>{});

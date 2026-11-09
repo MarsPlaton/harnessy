@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {RuntimeError} from './index.ts';
 import {harness,OWNER,deferred,until} from './test-helpers.ts';
-const target=(t:Parameters<typeof harness>[0])=>{const dir=realpathSync(mkdtempSync(join(tmpdir(),'harnessy-owner-project-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir};
+const target=(t:Parameters<typeof harness>[0])=>{const dir=realpathSync.native(mkdtempSync(join(tmpdir(),'harnessy-owner-project-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir};
 
 for(const action of ['set','create'])test('65: '+action+' checks real busy turn after queued owner operation without cancelling it',async t=>{
  const {runtime:r,provider:f}=await harness(t),original=r.project,dir=target(t),gate=deferred<{text:string;sessionId:null}>();f.onRun=async(_s,_m,c)=>{c.modelStarted?.();c.signal.addEventListener('abort',()=>gate.resolve({text:'',sessionId:null}),{once:true});return gate.promise};
